@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './api'
 import type { User } from './types'
@@ -8,17 +8,13 @@ const Ctx = createContext<AuthCtx>({ user: null, loading: true, login: async () 
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient()
-  const [demoUser, setDemoUser] = useState<User | null>(null)
   const { data, isLoading } = useQuery({ queryKey: ['me'], queryFn: () => api.me(), retry: false, staleTime: 60_000 })
-  useEffect(() => { if (data) setDemoUser(data) }, [data])
-  const user = data ?? demoUser
   const login = async (email: string, password: string) => {
-    const u = await api.login(email, password)
-    setDemoUser(u)
+    await api.login(email, password)
     qc.invalidateQueries({ queryKey: ['me'] })
   }
-  const logout = async () => { await api.logout(); setDemoUser(null); qc.invalidateQueries({ queryKey: ['me'] }) }
+  const logout = async () => { await api.logout(); qc.invalidateQueries({ queryKey: ['me'] }); qc.clear() }
   const refresh = () => qc.invalidateQueries({ queryKey: ['me'] })
-  return <Ctx.Provider value={{ user: user ?? null, loading: isLoading, login, logout, refresh }}>{children}</Ctx.Provider>
+  return <Ctx.Provider value={{ user: data ?? null, loading: isLoading, login, logout, refresh }}>{children}</Ctx.Provider>
 }
 export const useAuth = () => useContext(Ctx)
