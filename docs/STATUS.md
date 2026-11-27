@@ -152,20 +152,31 @@ implemented and live-tested (see below). Admin UI pages updated to use them.
 - Test admin + test announcement were deleted afterwards; only the original
   `admin@crushandconfo.local` remains in the local dev DB.
 
-### 4. GitHub push — IN PROGRESS 2026-11-27 ~08:00 UTC
-Repo `azimrohomanofficial24-art/crush-and-confo` (public, user-confirmed) is
-live but only contains the auto-created empty README so far. The GitHub MCP
-`push_files` tool fails with `403 Resource not accessible by integration` on
-`POST /git/trees` — the integration can read and can write single files via
-the Contents API (`create_or_update_file` works: README.md was updated in
-commit `3fb1a01`), but the Git Trees API is not accessible to it. The push is
-therefore being done file-by-file via the Contents API (109 text files;
-`CONTRACT.md`, `node_modules`, `dist`, `data/*.db`, `.env` excluded). The 5
-binary files (`apps/web/public/icon-192.png`, `icon-512.png`,
-`docs/design-references/*.png|*.webp`) cannot be pushed through the text-only
-Contents API — they are documented here and must be added via a git push with
-a GitHub token or via the GitHub web upload. PWA icons are referenced by the
-manifest; the app runs without them but the install icons will 404 until added.
+### 4. GitHub push — DONE (with 3 documented exceptions) 2026-11-27 ~08:08 UTC
+Repo `azimrohomanofficial24-art/crush-and-confo` (public, user-confirmed) now
+holds the full project: 107 of 110 text files pushed, latest commit
+`7a3a599` ("Crush and Confo: initial build — wrangler.jsonc",
+2026-11-27T08:08:36Z). The GitHub MCP `push_files` tool fails with `403
+Resource not accessible by integration` on `POST /git/trees`, so the push was
+done file-by-file via the Contents API (`create_or_update_file`), which works
+— verified by listing the repo root and reading back
+`apps/worker/src/routes/admin.ts` (new admin code present) and
+`migrations/0002_announcements.sql` from GitHub.
+**Not on GitHub (3 files + 5 binaries):**
+- `.github/workflows/ci.yml`, `.github/workflows/deploy.yml` — Contents API
+  returns 403 for workflow files: the GitHub App installation lacks the
+  `workflows` permission. Add them via a git push with a token that has
+  workflow scope, via the GitHub web UI, or by granting the App workflow
+  permission. Until then CI does not run on GitHub.
+- Root `package-lock.json` (152,844 bytes) — cannot be passed as a single CLI
+  argument (Linux 128 KB per-argument limit). Regenerable with `npm install`;
+  `apps/web/package-lock.json` (96 KB) is on GitHub.
+- 5 binary files — `apps/web/public/icon-192.png`, `icon-512.png`,
+  `docs/design-references/*.png|*.webp` — the text-only Contents API cannot
+  push binaries. Add via a git push with a token or the GitHub web upload.
+  The app runs without the PWA icons, but install icons will 404 until added.
+- `CONTRACT.md` is intentionally NOT in the public repo (internal build-team
+  instruction); `node_modules`, `dist`, `data/*.db`, `.env` are gitignored.
 
 ### 5. Playwright smoke — NOT RUN (environment limitation, retried 2026-11-27 ~08:05 UTC)
 `npx playwright install chromium` timed out downloading Chrome for Testing
