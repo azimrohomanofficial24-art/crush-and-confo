@@ -30,8 +30,9 @@ function paginate(rows: any[], cursor: any, limit: number) {
 r.get('/confessions', optionalAuth, async (c) => {
   const db = getDb(c.env); const a: any = (c as any).get('auth'); const limit = pageLimit(c.req.query('limit')); const cursor = decodeCursor(c.req.query('cursor'));
   const sort = c.req.query('sort') ?? 'latest';
+  const category = c.req.query('category') ?? c.req.query('topic');
   const rows = await db.select().from(confessions).where(eq(confessions.status, 'published')).orderBy(desc(confessions.createdAt)).limit(200);
-  let list = rows;
+  let list = category ? rows.filter((cf: any) => (cf.category ?? 'General') === category) : rows;
   if (sort === 'trending') {
     // Trending: most liked in the last 7 days (like count, then recency).
     const counts = new Map<string, number>();
@@ -48,6 +49,12 @@ r.get('/confessions/mine', requireAuth, async (c) => {
   const db = getDb(c.env); const a: any = (c as any).get('auth');
   const rows = await db.select().from(confessions).where(eq(confessions.authorId, a.userId)).orderBy(desc(confessions.createdAt));
   const out = []; for (const cf of rows) out.push(await confessionDto(db, cf, a.userId));
+  return ok(c, { items: out });
+});
+r.get('/confessions/saved/mine', requireAuth, async (c) => {
+  const db = getDb(c.env); const a: any = (c as any).get('auth');
+  const rows = await db.select().from(savedPosts).where(and(eq(savedPosts.userId, a.userId), sql`${savedPosts.confessionId} IS NOT NULL`)).orderBy(desc(savedPosts.createdAt));
+  const out = []; for (const s of rows) { const [cf] = await db.select().from(confessions).where(eq(confessions.id, s.confessionId!)).limit(1); if (cf && cf.status === 'published') out.push(await confessionDto(db, cf, a.userId)); }
   return ok(c, { items: out });
 });
 r.get('/confessions/:id', optionalAuth, async (c) => {
