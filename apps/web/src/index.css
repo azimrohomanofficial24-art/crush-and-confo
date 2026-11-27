@@ -40,6 +40,23 @@ body::before {
 .dark-mode body::before { opacity: 0.25; }
 .dark-mode .glass, .dark-mode .glass-soft { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.12); }
 .dark-mode .glass *, .dark-mode .glass-soft * { color: #F7F5FF; }
+/* Keep semantic colours visible in dark mode: pink hearts, purple links,
+   success/warning/error states and muted text must not be washed to white. */
+.dark-mode .glass .text-pink, .dark-mode .glass-soft .text-pink { color: #F52D91; }
+.dark-mode .glass .fill-pink, .dark-mode .glass-soft .fill-pink { fill: #F52D91; }
+.dark-mode .glass .text-purple, .dark-mode .glass-soft .text-purple { color: #B18CFF; }
+.dark-mode .glass .fill-purple, .dark-mode .glass-soft .fill-purple { fill: #B18CFF; }
+.dark-mode .glass .text-success, .dark-mode .glass-soft .text-success { color: #34D399; }
+.dark-mode .glass .text-warning, .dark-mode .glass-soft .text-warning { color: #FBBF24; }
+.dark-mode .glass .text-error, .dark-mode .glass-soft .text-error { color: #F87171; }
+.dark-mode .glass .text-muted, .dark-mode .glass-soft .text-muted { color: #B9B3CC; }
+.dark-mode .glass .text-white, .dark-mode .glass-soft .text-white { color: #FFFFFF; }
+.dark-mode .glass .text-white\/70, .dark-mode .glass-soft .text-white\/70 { color: rgba(255,255,255,0.7); }
+.dark-mode .glass .text-white\/80, .dark-mode .glass-soft .text-white\/80 { color: rgba(255,255,255,0.8); }
+.dark-mode .glass .text-white\/85, .dark-mode .glass-soft .text-white\/85 { color: rgba(255,255,255,0.85); }
+.dark-mode .glass .text-white\/90, .dark-mode .glass-soft .text-white\/90 { color: rgba(255,255,255,0.9); }
+.dark-mode .glass .text-ink\/80, .dark-mode .glass-soft .text-ink\/80, .dark-mode .glass .text-ink\/90, .dark-mode .glass-soft .text-ink\/90 { color: rgba(247,245,255,0.85); }
+.dark-mode .glass .text-ink\/85, .dark-mode .glass-soft .text-ink\/85 { color: rgba(247,245,255,0.85); }
 .dark-mode .input { background: rgba(255,255,255,0.08); color: #F7F5FF; border-color: rgba(255,255,255,0.15); }
 .dark-mode .nav-item { color: rgba(247,245,255,0.75); }
 .dark-mode .nav-item:hover, .dark-mode .nav-item-active { background: rgba(255,255,255,0.1); color: #fff; }
