@@ -1,16 +1,21 @@
 import { Bell, CheckCheck, Heart, MessageCircle, UserPlus, Info } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, timeAgo } from '../lib/api'
-import { Avatar, EmptyState, ErrorState, LoadingList } from '../components/ui'
+import { EmptyState, ErrorState, LoadingList } from '../components/ui'
 
 const ICONS: Record<string, typeof Heart> = { like: Heart, match: Heart, message: MessageCircle, comment: MessageCircle, follow: UserPlus, system: Info }
 
 export default function Notifications() {
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const list = useQuery({ queryKey: ['notifications'], queryFn: () => api.notifications() })
   const markOne = useMutation({ mutationFn: (id: string) => api.markNotificationRead(id), onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }) })
   const markAll = useMutation({ mutationFn: () => api.markAllNotificationsRead(), onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }) })
+  const sayHello = useMutation({
+    mutationFn: (matchId: string) => api.startConversation(matchId),
+    onSuccess: (conv) => navigate(`/messages?active=${conv.id}`),
+  })
   const unread = (list.data || []).filter((n) => !n.read).length
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -27,14 +32,19 @@ export default function Notifications() {
         <div className="space-y-3">
           {(list.data || []).map((n) => {
             const Icon = ICONS[n.type] || Info
+            const matchId = n.data && typeof n.data.matchId === 'string' ? n.data.matchId : null
             return (
               <div key={n.id} className={`glass flex items-start gap-3 p-4 ${n.read ? 'opacity-75' : ''}`}>
-                {n.actor ? <Avatar user={n.actor} size={44} /> : <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-lavender text-purple"><Icon className="h-5 w-5" /></span>}
+                <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${n.type === 'like' || n.type === 'match' ? 'bg-pink/10 text-pink' : 'bg-lavender text-purple'}`}>
+                  <Icon className={`h-5 w-5 ${n.type === 'like' || n.type === 'match' ? 'fill-pink' : ''}`} />
+                </span>
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-ink">{n.title}</p>
                   <p className="text-sm text-muted">{n.body}</p>
                   <p className="mt-1 text-xs text-muted">{timeAgo(n.createdAt)}</p>
-                  {n.type === 'match' && n.actor && <Link to="/messages" className="btn-gradient mt-2 !min-h-[36px] !px-4 !py-1.5 text-xs">Say hello</Link>}
+                  {n.type === 'match' && matchId && (
+                    <button onClick={() => sayHello.mutate(matchId)} disabled={sayHello.isPending} className="btn-gradient mt-2 !min-h-[36px] !px-4 !py-1.5 text-xs">Say hello</button>
+                  )}
                 </div>
                 {!n.read && <button onClick={() => markOne.mutate(n.id)} className="shrink-0 rounded-full bg-pink/10 px-3 py-1.5 text-xs font-semibold text-pink hover:bg-pink/20">Mark read</button>}
               </div>
@@ -42,7 +52,7 @@ export default function Notifications() {
           })}
         </div>
       )}
-      <p className="text-center text-sm text-muted">Manage what you hear about in <Link className="font-semibold text-purple" to="/settings">Settings → Notifications</Link>.</p>
+      <p className="text-center text-sm text-muted">Notifications for likes, matches, messages and comments are on. Manage your account in <Link className="font-semibold text-purple" to="/settings">Settings</Link>.</p>
     </div>
   )
 }
