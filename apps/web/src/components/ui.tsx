@@ -1,9 +1,23 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { AlertTriangle, FlaskConical, Loader2, X } from 'lucide-react'
-import { demoMode, onDemoModeChange } from '../lib/api'
+import type { ReactNode } from 'react'
+import { AlertTriangle, Loader2, X } from 'lucide-react'
 import type { User } from '../lib/types'
 
+/** Real user photo first; elegant gradient-initial placeholder only when the
+ *  user has not uploaded a photo. Never a stock or demo photo. */
 export function Avatar({ user, size = 40, className = '' }: { user: User; size?: number; className?: string }) {
+  if (user.avatarUrl) {
+    return (
+      <img
+        src={user.avatarUrl}
+        alt={user.fullName}
+        width={size}
+        height={size}
+        loading="lazy"
+        className={`shrink-0 rounded-full object-cover ${className}`}
+        style={{ width: size, height: size }}
+      />
+    )
+  }
   return (
     <span
       className={`relative inline-flex shrink-0 items-center justify-center rounded-full font-bold text-white ${className}`}
@@ -11,7 +25,6 @@ export function Avatar({ user, size = 40, className = '' }: { user: User; size?:
       aria-label={user.fullName}
     >
       {user.avatarInitials}
-      {user.online && <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-success" />}
     </span>
   )
 }
@@ -49,17 +62,6 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry: () 
       <p className="mt-1 text-sm text-muted">{message}</p>
       <button className="btn-gradient mt-4" onClick={onRetry}>Try again</button>
     </div>
-  )
-}
-
-export function DemoBadge() {
-  const [, setTick] = useState(0)
-  useEffect(() => onDemoModeChange(() => setTick((t) => t + 1)), [])
-  if (!demoMode) return null
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2.5 py-1 text-[11px] font-semibold text-warning" title="The live API is not reachable, so this page is using local demo data.">
-      <FlaskConical className="h-3 w-3" /> Demo data
-    </span>
   )
 }
 
