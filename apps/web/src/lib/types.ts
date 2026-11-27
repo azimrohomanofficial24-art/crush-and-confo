@@ -1,15 +1,20 @@
-// Shared frontend types. Mirrors the API contract in CONTRACT.md.
+// Shared frontend types. These mirror the REAL Worker API shapes
+// (see docs/API.md) — adapters in lib/api.ts map the server DTOs onto them.
 // Match % is a compatibility estimate, NOT scientifically validated.
+// There is NO demo data anywhere in the app: every list comes from /api/*
+// and empty results render as honest empty states.
 export interface User {
   id: string
   username: string
   fullName: string
-  age: number
+  age: number | null
   city: string
   country: string
   gender: string
   interestedIn: string
   bio: string
+  /** Real photo URL served by the Worker from R2 (/api/uploads/…), or null. */
+  avatarUrl: string | null
   avatarColor: string
   avatarInitials: string
   interests: string[]
@@ -33,6 +38,7 @@ export interface Post {
   feeling?: string
   location?: string
   hashtag?: string
+  imageUrl?: string | null
 }
 export interface Confession {
   id: string
@@ -46,8 +52,15 @@ export interface Confession {
   savedByMe: boolean
   topic: string
 }
+export interface Match {
+  id: string
+  otherUser: User
+  createdAt: string
+}
 export interface Conversation {
   id: string
+  matchId: string | null
+  members: User[]
   otherUser: User
   lastMessage: string
   lastMessageAt: string
@@ -70,6 +83,14 @@ export interface AppNotification {
   createdAt: string
   read: boolean
   actor?: User
+  /** Raw notification payload (e.g. { matchId } on match notifications). */
+  data?: Record<string, unknown> | null
 }
 export interface Comment { id: string; author: User; text: string; createdAt: string }
 export interface ApiResponse<T> { ok: boolean; data?: T; error?: string }
+export interface ProfileData {
+  user: User
+  interests: string[]
+  counts: { followers: number; following: number; posts: number }
+}
+export const TOPIC_CATEGORIES = ['Love', 'Crush', 'Friendship', 'Motivation', 'Life'] as const
