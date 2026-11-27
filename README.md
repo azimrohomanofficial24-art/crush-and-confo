@@ -11,8 +11,9 @@ join the community, message mutual matches, and get notified.
   `docs/design-references/reference-a-white-glass-dashboard.png`.
 - **Strictly 18+.** Age is calculated server-side from date of birth;
   registration is rejected if under 18.
-- **Status:** local build in progress. No GitHub repo and no live deployment
-  exist yet — see [docs/STATUS.md](docs/STATUS.md) for the exact remaining steps.
+- **Status:** built and tested locally; first GitHub push in progress to
+  [azimrohomanofficial24-art/crush-and-confo](https://github.com/azimrohomanofficial24-art/crush-and-confo)
+  (public). No live Cloudflare deployment yet — see [docs/STATUS.md](docs/STATUS.md) for the exact remaining steps.
 
 ## Stack
 
