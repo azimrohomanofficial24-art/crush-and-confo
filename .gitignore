@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Builds
+dist/
+build/
+apps/web/dist/
+apps/worker/dist/
+*.tsbuildinfo
+
+# Environment & secrets — NEVER commit these
+.env
+.env.*
+!.env.example
+
+# Local databases & Wrangler state
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+data/
+.dev.vars
+.wrangler/
+wrangler-state/
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Misc
+.DS_Store
+*.log
+coverage/
+.vite/
