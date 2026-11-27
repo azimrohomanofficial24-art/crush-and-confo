@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
-import { Bookmark, Crown, Heart, Lock, MapPin, Save, Settings as SettingsIcon, ShieldAlert, Trash2, UserRound, Users } from 'lucide-react'
+import { Bookmark, Heart, Lock, MapPin, Save, Settings as SettingsIcon, ShieldAlert, Trash2, UserRound, Users } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
-import { currentUser, resetDemo, trendingTopics } from '../lib/demoData'
 import { useAuth } from '../lib/auth'
 import { Avatar, EmptyState, ErrorState, LoadingList, MatchNote, Modal, Spinner } from '../components/ui'
 import { ConfessionCard, FollowButton, PostCard } from '../components/feed'
+import { PhotoUpload } from '../components/PhotoUpload'
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -22,7 +22,7 @@ export function Dashboard() {
       <h1 className="font-display text-2xl font-extrabold text-ink sm:text-3xl">Welcome back, {user?.fullName.split(' ')[0] || 'friend'}</h1>
       <p className="text-sm text-muted">Your personal dashboard — matches, messages and confessions at a glance.</p>
       <div className="grid gap-3 sm:grid-cols-3">
-        <Link to="/my-matches" className="glass p-5 hover:shadow-glass"><Heart className="h-6 w-6 text-pink" /><p className="mt-2 font-display text-xl font-extrabold text-ink">My Matches</p><p className="text-sm text-muted">See everyone you matched with.</p></Link>
+        <Link to="/my-matches" className="glass p-5 hover:shadow-glass"><Heart className="h-6 w-6 fill-pink text-pink" /><p className="mt-2 font-display text-xl font-extrabold text-ink">My Matches</p><p className="text-sm text-muted">See everyone you matched with.</p></Link>
         <Link to="/messages" className="glass p-5 hover:shadow-glass"><Users className="h-6 w-6 text-purple" /><p className="mt-2 font-display text-xl font-extrabold text-ink">Messages</p><p className="text-sm text-muted">Continue your conversations.</p></Link>
         <Link to="/my-confessions" className="glass p-5 hover:shadow-glass"><Bookmark className="h-6 w-6 text-warning" /><p className="mt-2 font-display text-xl font-extrabold text-ink">My Confessions</p><p className="text-sm text-muted">Everything you have shared.</p></Link>
       </div>
@@ -43,9 +43,14 @@ export function Dashboard() {
 
 export function MyMatches() {
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const list = useQuery({ queryKey: ['matches'], queryFn: () => api.matches() })
   const unmatch = useMutation({ mutationFn: (id: string) => api.unmatch(id), onSuccess: () => { setConfirmId(null); qc.invalidateQueries({ queryKey: ['matches'] }) } })
+  const message = useMutation({
+    mutationFn: (matchId: string) => api.startConversation(matchId),
+    onSuccess: (conv) => navigate(`/messages?active=${conv.id}`),
+  })
   return (
     <div className="space-y-5">
       <div><h1 className="font-display text-2xl font-extrabold text-ink sm:text-3xl">My Matches</h1><p className="text-sm text-muted">People who liked you back. Chat opens only after a mutual match.</p><MatchNote /></div>
@@ -53,15 +58,15 @@ export function MyMatches() {
         <EmptyState icon={<Heart className="h-6 w-6" />} title="No matches yet" body="Keep liking people in Matching — mutual likes appear here." action={<Link to="/matching" className="btn-gradient">Start matching</Link>} />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {(list.data || []).map((u) => (
-            <div key={u.id} className="glass p-4">
+          {(list.data || []).map((m) => (
+            <div key={m.id} className="glass p-4">
               <div className="flex items-center gap-3">
-                <Link to={`/profile/${u.username}`}><Avatar user={u} size={56} /></Link>
-                <div className="min-w-0 flex-1"><Link to={`/profile/${u.username}`} className="block truncate font-semibold text-ink hover:text-purple">{u.fullName}, {u.age}</Link><p className="text-xs text-muted">{u.city} · {u.matchPercent}% Match</p></div>
+                <Link to={`/profile/${m.otherUser.username}`}><Avatar user={m.otherUser} size={56} /></Link>
+                <div className="min-w-0 flex-1"><Link to={`/profile/${m.otherUser.username}`} className="block truncate font-semibold text-ink hover:text-purple">{m.otherUser.fullName}{m.otherUser.age != null ? `, ${m.otherUser.age}` : ''}</Link><p className="text-xs text-muted">{m.otherUser.city || 'Bangladesh'}</p></div>
               </div>
               <div className="mt-3 flex gap-2">
-                <Link to="/messages" className="btn-gradient flex-1 !min-h-[40px] !py-2 text-xs">Message</Link>
-                <button className="btn-danger" onClick={() => setConfirmId(u.id)}>Unmatch</button>
+                <button onClick={() => message.mutate(m.id)} disabled={message.isPending} className="btn-gradient flex-1 !min-h-[40px] !py-2 text-xs">{message.isPending ? <Spinner /> : 'Message'}</button>
+                <button className="btn-danger" onClick={() => setConfirmId(m.id)}>Unmatch</button>
               </div>
             </div>
           ))}
@@ -106,7 +111,7 @@ export function MyConfessions() {
     <div className="mx-auto max-w-3xl space-y-5">
       <h1 className="font-display text-2xl font-extrabold text-ink sm:text-3xl">My Confessions</h1>
       <p className="text-sm text-muted">Only you can see this list — anonymous confessions stay anonymous to everyone else.</p>
-      {list.isLoading ? <LoadingList /> : (list.data || []).length === 0 ? (
+      {list.isLoading ? <LoadingList /> : list.isError ? <ErrorState message="Could not load your confessions." onRetry={() => list.refetch()} /> : (list.data || []).length === 0 ? (
         <EmptyState icon={<Heart className="h-6 w-6" />} title="You haven't confessed yet" body="Share what's on your heart — anonymously if you like." action={<Link to="/confessions" className="btn-gradient">Write a confession</Link>} />
       ) : (list.data || []).map((c) => <ConfessionCard key={c.id} confession={c} />)}
     </div>
@@ -125,7 +130,7 @@ function PeopleList({ title, queryKey, fetcher }: { title: string; queryKey: str
           {(list.data || []).map((u) => (
             <div key={u.id} className="glass flex items-center gap-3 p-4">
               <Link to={`/profile/${u.username}`}><Avatar user={u} size={48} /></Link>
-              <div className="min-w-0 flex-1"><Link to={`/profile/${u.username}`} className="block truncate font-semibold text-ink hover:text-purple">{u.fullName}</Link><p className="truncate text-xs text-muted">@{u.username} · {u.city}</p></div>
+              <div className="min-w-0 flex-1"><Link to={`/profile/${u.username}`} className="block truncate font-semibold text-ink hover:text-purple">{u.fullName}</Link><p className="truncate text-xs text-muted">@{u.username} · {u.city || 'Bangladesh'}</p></div>
               <FollowButton userId={u.id} initialFollowing={queryKey === 'following'} />
             </div>
           ))}
@@ -145,7 +150,7 @@ export function Blocked() {
     <div className="space-y-5">
       <h1 className="font-display text-2xl font-extrabold text-ink sm:text-3xl">Blocked users</h1>
       <p className="text-sm text-muted">Blocked people cannot message you, see your posts, or appear in matching.</p>
-      {list.isLoading ? <LoadingList /> : (list.data || []).length === 0 ? (
+      {list.isLoading ? <LoadingList /> : list.isError ? <ErrorState message="Could not load blocked users." onRetry={() => list.refetch()} /> : (list.data || []).length === 0 ? (
         <EmptyState icon={<ShieldAlert className="h-6 w-6" />} title="Nobody blocked" body="You can block someone from their profile if you ever need to." />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -162,43 +167,71 @@ export function Blocked() {
   )
 }
 
+const INTENTIONS = ['Friendship', 'Dating', 'Serious relationship', 'Casual dating', 'Just exploring']
+const GENDER_OPTIONS = ['Female', 'Male', 'Everyone'] as const
+
 export function MatchingPreferences() {
-  const [prefs, setPrefs] = useState({ minAge: 18, maxAge: 30, maxDistanceKm: 50, interestedIn: 'Female', topics: ['Love', 'Music'] })
-  const [saved, setSaved] = useState(false)
-  const save = () => { try { localStorage.setItem('cc-matching-prefs', JSON.stringify(prefs)) } catch { /* ignore */ } setSaved(true); setTimeout(() => setSaved(false), 2500) }
-  useEffect(() => { try { const raw = localStorage.getItem('cc-matching-prefs'); if (raw) setPrefs(JSON.parse(raw)) } catch { /* ignore */ } }, [])
+  const qc = useQueryClient()
+  const loaded = useQuery({ queryKey: ['matching-preferences'], queryFn: () => api.matchingPreferences() })
+  const [prefs, setPrefs] = useState({ minAge: 18, maxAge: 30, maxDistanceKm: 50, interestedIn: 'Female' as (typeof GENDER_OPTIONS)[number], intentions: '' })
+  const [loadedOnce, setLoadedOnce] = useState(false)
+  useEffect(() => {
+    if (loaded.data && !loadedOnce) {
+      const p = loaded.data
+      setPrefs({
+        minAge: p.minAge ?? 18,
+        maxAge: p.maxAge ?? 30,
+        maxDistanceKm: p.maxDistanceKm ?? 50,
+        interestedIn: (p.preferredGenders || []).length === 1 && p.preferredGenders[0] === 'female' ? 'Female' : (p.preferredGenders || []).length === 1 && p.preferredGenders[0] === 'male' ? 'Male' : 'Everyone',
+        intentions: p.intentions ?? '',
+      })
+      setLoadedOnce(true)
+    }
+  }, [loaded.data, loadedOnce])
+  const save = useMutation({
+    mutationFn: () => api.saveMatchingPreferences({
+      minAge: prefs.minAge,
+      maxAge: prefs.maxAge,
+      preferredGenders: prefs.interestedIn === 'Female' ? ['female'] : prefs.interestedIn === 'Male' ? ['male'] : [],
+      maxDistanceKm: prefs.maxDistanceKm,
+      intentions: prefs.intentions || null,
+    }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['discover'] }),
+  })
   return (
     <div className="mx-auto max-w-2xl space-y-5">
       <h1 className="font-display text-2xl font-extrabold text-ink sm:text-3xl">Matching preferences</h1>
-      <p className="text-sm text-muted">These shape who you see in Matching. Match % is a compatibility estimate, not scientifically validated.</p>
-      <section className="glass space-y-5 p-5">
-        <div>
-          <label className="label" htmlFor="pref-age">Age range: {prefs.minAge} – {prefs.maxAge}</label>
-          <div className="flex items-center gap-3">
-            <input id="pref-age" type="range" min={18} max={60} value={prefs.minAge} onChange={(e) => setPrefs({ ...prefs, minAge: Math.min(Number(e.target.value), prefs.maxAge) })} className="w-full accent-pink" aria-label="Minimum age" />
-            <input type="range" min={18} max={60} value={prefs.maxAge} onChange={(e) => setPrefs({ ...prefs, maxAge: Math.max(Number(e.target.value), prefs.minAge) })} className="w-full accent-purple" aria-label="Maximum age" />
+      <p className="text-sm text-muted">These shape who you see in Discover. They are saved to your account. Match % is a compatibility estimate, not scientifically validated.</p>
+      {loaded.isLoading ? <LoadingList /> : loaded.isError ? <ErrorState message="Could not load your preferences." onRetry={() => loaded.refetch()} /> : (
+        <section className="glass space-y-5 p-5">
+          <div>
+            <label className="label" htmlFor="pref-age">Age range: {prefs.minAge} – {prefs.maxAge}</label>
+            <div className="flex items-center gap-3">
+              <input id="pref-age" type="range" min={18} max={60} value={prefs.minAge} onChange={(e) => setPrefs({ ...prefs, minAge: Math.min(Number(e.target.value), prefs.maxAge) })} className="w-full accent-pink" aria-label="Minimum age" />
+              <input type="range" min={18} max={60} value={prefs.maxAge} onChange={(e) => setPrefs({ ...prefs, maxAge: Math.max(Number(e.target.value), prefs.minAge) })} className="w-full accent-purple" aria-label="Maximum age" />
+            </div>
           </div>
-        </div>
-        <div>
-          <label className="label" htmlFor="pref-dist">Maximum distance: {prefs.maxDistanceKm} km</label>
-          <input id="pref-dist" type="range" min={5} max={500} step={5} value={prefs.maxDistanceKm} onChange={(e) => setPrefs({ ...prefs, maxDistanceKm: Number(e.target.value) })} className="w-full accent-purple" />
-        </div>
-        <div>
-          <label className="label" htmlFor="pref-int">Interested in</label>
-          <select id="pref-int" className="input" value={prefs.interestedIn} onChange={(e) => setPrefs({ ...prefs, interestedIn: e.target.value })}>
-            <option>Female</option><option>Male</option><option>Everyone</option>
-          </select>
-        </div>
-        <div>
-          <span className="label">Topics you care about</span>
-          <div className="flex flex-wrap gap-2">
-            {trendingTopics.map((t) => (
-              <button key={t} onClick={() => setPrefs({ ...prefs, topics: prefs.topics.includes(t) ? prefs.topics.filter((x) => x !== t) : [...prefs.topics, t] })} className={prefs.topics.includes(t) ? 'chip !bg-purple !text-white' : 'chip'}>#{t}</button>
-            ))}
+          <div>
+            <label className="label" htmlFor="pref-dist">Maximum distance: {prefs.maxDistanceKm} km</label>
+            <input id="pref-dist" type="range" min={5} max={500} step={5} value={prefs.maxDistanceKm} onChange={(e) => setPrefs({ ...prefs, maxDistanceKm: Number(e.target.value) })} className="w-full accent-purple" />
           </div>
-        </div>
-        <button className="btn-gradient" onClick={save}>{saved ? 'Saved!' : 'Save preferences'}</button>
-      </section>
+          <div>
+            <label className="label" htmlFor="pref-int">Interested in</label>
+            <select id="pref-int" className="input" value={prefs.interestedIn} onChange={(e) => setPrefs({ ...prefs, interestedIn: e.target.value as (typeof GENDER_OPTIONS)[number] })}>
+              {GENDER_OPTIONS.map((g) => <option key={g}>{g}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label" htmlFor="pref-intention">What are you looking for?</label>
+            <select id="pref-intention" className="input" value={prefs.intentions} onChange={(e) => setPrefs({ ...prefs, intentions: e.target.value })}>
+              <option value="">No preference</option>
+              {INTENTIONS.map((i) => <option key={i}>{i}</option>)}
+            </select>
+          </div>
+          {save.isError && <p className="text-sm text-error" role="alert">Could not save your preferences. Please try again.</p>}
+          <button className="btn-gradient" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? <Spinner /> : save.isSuccess ? 'Saved!' : 'Save preferences'}</button>
+        </section>
+      )}
     </div>
   )
 }
@@ -206,43 +239,62 @@ export function MatchingPreferences() {
 export function Settings() {
   const [params] = useSearchParams()
   const tab = params.get('tab') || 'profile'
-  const { user, logout } = useAuth()
+  const { user, logout, refresh } = useAuth()
   const navigate = useNavigate()
-  const [bio, setBio] = useState(currentUser.bio)
-  const [city, setCity] = useState(currentUser.city)
-  const [saved, setSaved] = useState(false)
-  const [notifPrefs, setNotifPrefs] = useState({ likes: true, matches: true, messages: true, comments: false })
+  const qc = useQueryClient()
+  const myProfile = useQuery({ queryKey: ['my-profile'], queryFn: () => api.myProfile() })
+  const [bio, setBio] = useState('')
+  const [city, setCity] = useState('')
+  const [country, setCountry] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [seeded, setSeeded] = useState(false)
+  useEffect(() => {
+    if (myProfile.data && !seeded) {
+      setBio(myProfile.data.profile?.bio ?? '')
+      setCity(myProfile.data.profile?.city ?? '')
+      setCountry(myProfile.data.profile?.country ?? '')
+      setAvatarUrl(myProfile.data.profile?.avatarUrl ?? null)
+      setSeeded(true)
+    }
+  }, [myProfile.data, seeded])
+  const saveProfile = useMutation({
+    mutationFn: () => api.updateProfile({ bio: bio || null, city: city || null, country: country || null, avatarUrl }),
+    onSuccess: () => { refresh(); qc.invalidateQueries({ queryKey: ['me'] }); qc.invalidateQueries({ queryKey: ['my-profile'] }) },
+  })
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const saveProfile = () => { currentUser.bio = bio; currentUser.city = city; setSaved(true); setTimeout(() => setSaved(false), 2500) }
-  const deleteAccount = async () => { await logout(); navigate('/'); }
+  const [deleteError, setDeleteError] = useState('')
+  const deleteAccount = useMutation({
+    mutationFn: () => api.deleteAccount(),
+    onSuccess: async () => { await logout(); navigate('/') },
+    onError: () => setDeleteError('Could not delete your account. Please try again.'),
+  })
   return (
     <div className="mx-auto max-w-2xl space-y-5">
       <h1 className="font-display text-2xl font-extrabold text-ink sm:text-3xl">Settings</h1>
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Settings sections">
-        {(['profile', 'notifications', 'privacy', 'premium'] as const).map((t) => (
+        {(['profile', 'notifications', 'privacy'] as const).map((t) => (
           <Link key={t} to={`/settings?tab=${t}`} className={tab === t ? 'btn-gradient !min-h-[36px] !px-4 !py-1.5 text-xs capitalize' : 'btn-ghost !min-h-[36px] !px-4 !py-1.5 text-xs capitalize'}>{t}</Link>
         ))}
       </div>
       {tab === 'profile' && (
         <section className="glass space-y-4 p-5">
           <h2 className="card-title flex items-center gap-2"><UserRound className="h-5 w-5 text-purple" /> Edit profile</h2>
-          <div className="flex items-center gap-3"><Avatar user={user || currentUser} size={64} /><div><p className="font-semibold text-ink">{user?.fullName}</p><p className="text-sm text-muted">@{user?.username}</p></div></div>
-          <div><label className="label" htmlFor="set-bio">Bio</label><textarea id="set-bio" rows={3} className="input resize-none" value={bio} onChange={(e) => setBio(e.target.value)} /></div>
-          <div><label className="label" htmlFor="set-city">City</label><input id="set-city" className="input" value={city} onChange={(e) => setCity(e.target.value)} /></div>
+          {user && <PhotoUpload user={{ ...user, avatarUrl }} onUploaded={(url) => { setAvatarUrl(url); refresh() }} />}
+          <div><label className="label" htmlFor="set-bio">Bio</label><textarea id="set-bio" rows={3} className="input resize-none" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Tell people a little about yourself…" /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="label" htmlFor="set-city">City</label><input id="set-city" className="input" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Dhaka" /></div>
+            <div><label className="label" htmlFor="set-country">Country</label><input id="set-country" className="input" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Bangladesh" /></div>
+          </div>
           <p className="flex items-center gap-1.5 text-sm text-muted"><MapPin className="h-4 w-4" /> Location is used for matching distance — never shared precisely.</p>
-          <button className="btn-gradient" onClick={saveProfile}>{saved ? 'Saved!' : 'Save changes'}</button>
+          {saveProfile.isError && <p className="text-sm text-error" role="alert">Could not save your profile. Please try again.</p>}
+          <button className="btn-gradient" disabled={saveProfile.isPending} onClick={() => saveProfile.mutate()}>{saveProfile.isPending ? <Spinner /> : saveProfile.isSuccess ? 'Saved!' : 'Save changes'}</button>
         </section>
       )}
       {tab === 'notifications' && (
         <section className="glass space-y-4 p-5">
-          <h2 className="card-title">Notification preferences</h2>
-          {(Object.keys(notifPrefs) as (keyof typeof notifPrefs)[]).map((k) => (
-            <label key={k} className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl bg-lavender/40 px-4 py-3 text-sm font-medium capitalize">
-              {k === 'likes' ? 'New likes' : k === 'matches' ? 'New matches' : k === 'messages' ? 'New messages' : 'New comments'}
-              <input type="checkbox" checked={notifPrefs[k]} onChange={(e) => setNotifPrefs({ ...notifPrefs, [k]: e.target.checked })} className="h-5 w-5 accent-purple" />
-            </label>
-          ))}
-          <p className="text-sm text-muted">Preferences are saved on your device in demo mode and synced to your account when the live API is connected.</p>
+          <h2 className="card-title">Notifications</h2>
+          <p className="text-sm leading-relaxed text-muted">Notifications for new likes, matches, messages and comments are on for your account. You can mark individual notifications as read, or mark all as read, from the Notifications page.</p>
+          <Link to="/notifications" className="btn-ghost">Open Notifications</Link>
         </section>
       )}
       {tab === 'privacy' && (
@@ -251,7 +303,6 @@ export function Settings() {
           <Link to="/blocked" className="btn-ghost w-full justify-start">Manage blocked users</Link>
           <Link to="/safety" className="btn-ghost w-full justify-start">Safety tips</Link>
           <Link to="/privacy" className="btn-ghost w-full justify-start">Privacy policy</Link>
-          <button className="btn-ghost w-full justify-start" onClick={() => { resetDemo(); window.location.reload() }}>Reset demo data</button>
           <div className="rounded-2xl border border-error/30 bg-error/5 p-4">
             <h3 className="flex items-center gap-2 font-semibold text-error"><Trash2 className="h-4 w-4" /> Delete account</h3>
             <p className="mt-1 text-sm text-muted">This permanently deletes your profile, posts, confessions and messages. This cannot be undone.</p>
@@ -259,26 +310,15 @@ export function Settings() {
               <button className="btn-danger mt-3" onClick={() => setConfirmDelete(true)}>Delete my account</button>
             ) : (
               <div className="mt-3 flex gap-2">
-                <button className="btn-danger flex-1" onClick={deleteAccount}>Yes, delete everything</button>
+                <button className="btn-danger flex-1" disabled={deleteAccount.isPending} onClick={() => deleteAccount.mutate()}>{deleteAccount.isPending ? <Spinner /> : 'Yes, delete everything'}</button>
                 <button className="btn-ghost flex-1" onClick={() => setConfirmDelete(false)}>Cancel</button>
               </div>
             )}
+            {deleteError && <p className="mt-2 text-sm text-error" role="alert">{deleteError}</p>}
           </div>
         </section>
       )}
-      {tab === 'premium' && (
-        <section className="glass space-y-4 p-5 text-center">
-          <Crown className="mx-auto h-10 w-10 text-warning" />
-          <h2 className="card-title">Go Premium</h2>
-          <p className="text-sm text-muted">More matches, unlimited Super Likes, see who liked you, and an ad-free experience.</p>
-          <ul className="mx-auto max-w-sm space-y-2 text-left text-sm">
-            <li>✓ See who liked you</li><li>✓ Unlimited Super Likes</li><li>✓ Priority in matching</li><li>✓ Read receipts in chat</li>
-          </ul>
-          <p className="rounded-2xl bg-lavender/50 p-3 text-sm text-muted">Payments are not enabled yet — Premium checkout will be added with the billing provider. This page is a preview of the plan.</p>
-          <button className="btn-gradient" onClick={() => alert('Premium checkout is not enabled yet. Payments will be added with the billing provider.')}>Upgrade to Premium</button>
-        </section>
-      )}
-      <p className="flex items-center gap-2 text-xs text-muted"><SettingsIcon className="h-3.5 w-3.5" /> Signed in as {user?.username || 'demo user'} · <button className="font-semibold text-error underline" onClick={() => { logout(); navigate('/') }}>Log out</button></p>
+      <p className="flex items-center gap-2 text-xs text-muted"><SettingsIcon className="h-3.5 w-3.5" /> Signed in as {user?.username} · <button className="font-semibold text-error underline" onClick={() => { logout(); navigate('/') }}>Log out</button></p>
     </div>
   )
 }
