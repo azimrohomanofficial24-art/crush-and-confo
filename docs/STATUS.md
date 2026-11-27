@@ -6,10 +6,97 @@
 (version `557045ce`, `/api/health` 200, homepage renders). Production D1 is
 fresh/empty — **no demo data**. The refactor in the section below is built and
 tested locally and was **pushed to GitHub 2026-11-27 ~15:15 +06** (29 files,
-demoData.ts deleted), but is **NOT yet redeployed** — the Cloudflare API token
-was not available in the deploy session (see §6).
+demoData.ts deleted), and **REDEPLOYED LIVE 2026-11-27 ~15:28 +06** (version
+`384444c9-364f-4505-b7aa-ba9cb11de141`, `/api/health` 200,
+`/api/posts` and `/api/confessions` return empty `{items: []}`, homepage 200
+with the new JS bundle, no Samiya / John Bay / 98K+ / 12K+ / 95K+ in the
+homepage, API responses or JS bundle).
 
-## Refactor 2026-11-27 ~15:00 +06 — no demo data, photo-led Discover (pushed to GitHub ~15:15 +06; NOT yet redeployed — Cloudflare API token unavailable in the deploy session, see §6)
+## Login / email / UI audit fix 2026-11-27 ~15:40 +06 — built + tested locally, NOT yet pushed, NOT yet redeployed live
+
+User reported (angrily, in Bengali): login does not work, no email arrives,
+verification never happens, UI is not arranged/polished. Audit findings
+(verified locally against a throwaway SQLite worker, NOT live — no live
+test account was created):
+- **Login root cause — NOT a server block.** The worker login route never
+  checks `emailVerified`, and local register → login → `/api/auth/me`
+  works (201 → 200 + session cookie → 200). What actually broke the user:
+  (a) the login form only accepted an **email address** (zod email rule)
+  while the server also accepts a **username** — logging in with a username
+  was rejected client-side before any request; (b) **every** login/register
+  failure was swallowed and shown as "Invalid email or password" /
+  "username or email may already be taken" — including the **429 rate
+  limit** (old limit was 10/min per IP, shared by everyone behind one
+  mobile-carrier NAT IP in Bangladesh, so a few retries locked the user
+  out) and validation errors; (c) after register the user was sent to
+  `/verify-email` with no token and told to check an inbox that never
+  receives anything (see email root cause), so the flow looked dead even
+  though login itself would have worked.
+- **Email / verify root cause — Resend is still dev-mode only.** No
+  `RESEND_API_KEY`, no verified domain. `sendMail` logs and returns
+  `sent:false`; the verification email is never sent. Two more bugs fed
+  it: (a) the register response's `devVerificationToken` was **discarded
+  by the frontend** (`api.register` destructured only `{user}`), so the
+  one working verification path was thrown away; (b) production
+  `wrangler.jsonc` `APP_URL` was `https://crush-and-confo.pages.dev` —
+  a domain that does not exist — so even once Resend is configured, the
+  verification/reset links would have pointed at a dead domain.
+  Forgot-password had the same lie: the server put the dev reset token
+  only in an `X-Dev-Reset-Token` header the frontend never read, while
+  the page promised "Reset link sent to your inbox".
+- **Fixes in this change (local code only):** login accepts email **or**
+  username (label/placeholder updated); real server errors are shown
+  (429 → "Too many attempts, wait a minute", 401/409/validation surfaced
+  instead of generic text); rate limit raised 10 → 30/min per IP per
+  path; register hands its `devVerificationToken` to the verify page
+  (navigation state + this-tab `sessionStorage`), and VerifyEmail now
+  offers a working **"Verify my email now"** button while email is
+  unconfigured, stating plainly that login is not blocked on
+  verification; forgot-password now returns `devResetToken` **in the
+  response body** and the page shows a real one-time reset link instead
+  of claiming an email was sent; production `APP_URL` fixed to
+  `https://crush-and-confo.crush-and-confo.workers.dev`; session cookie
+  `Secure` flag is now decided from the request URL being https (the old
+  `process.env.NODE_ENV === 'production'` check is unset on Workers, so
+  the production cookie was never Secure; local http stays non-Secure so
+  local login still works) — same for admin login/logout; 18+ server-side
+  DOB check, anonymous-confession `authorId` hiding, and
+  mutual-match-before-messaging are all untouched.
+- **UI bugs found and fixed:** (1) Home hero "Start Exploring" had pink
+  text on the pink→purple gradient (`btn-gradient !bg-white !text-pink`
+  — `!bg-white` only sets background-*color*, the gradient
+  background-*image* still painted over it) — now a real solid-white
+  button with pink text; (2) DiscoverCard's heart badge was a decorative
+  `<span>` that looked like a Like button but only navigated to the
+  profile — now a real Like button (only when a like handler exists,
+  click does not navigate); (3) Register Gender/City were two cramped
+  columns at 375px — now stacked on mobile (`grid-cols-1
+  sm:grid-cols-2`); (4) Explore's search box went stale when navigating
+  from the header search — it now syncs to the `?q=` param. Kept as-is
+  per the user: login UI, menu UI, gradient/plus buttons, White Glass
+  tokens. No photos exist yet for Discover because no real user has
+  uploaded one — placeholders remain gradient initials, never stock/demo
+  photos; that only changes as real users join and upload.
+- **Local verification after the fix:** `npm run build` exit 0 (web
+  1664 modules, JS 479.65 kB; worker `tsc` clean). `npm test` **39/39
+  pass** (35 before + 4 new `tests/session-cookie.test.ts`). Local e2e
+  (throwaway SQLite, port 8792, NOT live): register → 201 with
+  `devVerificationToken`; verify with it → `{"verified":true}`, reuse →
+  `invalid_token`; login by **username** → 200 + cookie, `/api/auth/me`
+  → 200; forgot-password → body contains `devResetToken`; 15 wrong
+  logins → all 401 (no 429 at the new 30/min limit); under-18 register
+  → 400; duplicate register → 409. Test DB deleted afterwards.
+- **Still blocked for live:** this change is **NOT pushed to GitHub and
+  NOT redeployed** from this session if the push below failed — see §6.
+  Live email still needs a Resend account + verified domain +
+  `wrangler secret put RESEND_API_KEY` + verified `RESEND_FROM` +
+  redeploy (see docs/EMAIL.md); until then the in-app verify/reset
+  links above are the working path. Redeploy needs a Cloudflare API
+  token: `npm run db:migrate:remote` (no new migrations in this change)
+  then `npm run deploy`, then verify `/api/health` + register/login on
+  the live site.
+
+## Refactor 2026-11-27 ~15:00 +06 — no demo data, photo-led Discover (pushed to GitHub ~15:15 +06; REDEPLOYED LIVE ~15:28 +06 as version `384444c9`, see §6)
 
 The user rejected all demo data and asked for a fully developed, professional,
 fresh site for commercial use in Bangladesh. The frontend was rebuilt to use
@@ -132,18 +219,7 @@ and login). Mobile-first layouts (375px grid, bottom nav, responsive cards).
   Needs: Resend account + verified domain + `wrangler secret put
   RESEND_API_KEY` + verified `RESEND_FROM`, redeploy, end-to-end verify-email
   / forgot-password test.
-- **Redeploy the refactor (NOT done):** the refactor is on GitHub but the
-  live site still serves the old demo version (`557045ce`). Redeploy was
-  attempted 2026-11-27 ~15:13 +06 and blocked: `wrangler whoami` reports "not
-  authenticated", no `CLOUDFLARE_API_TOKEN` env var exists in the session, the
-  Cloudflare connector reports `not_connected`, and no `custom.cloudflare`
-  connector with the token is stored. The token value ("Crush and Confo
-  Workers Deploy", created 2026-11-27 ~14:28 +06) was never available to the
-  deploy agent and is not recorded anywhere. To redeploy: supply the token via
-  the secure Cloudflare connector or `CLOUDFLARE_API_TOKEN` env var, then run
-  `npm run deploy` in `~/workspace/crush-and-confo/` and verify `/api/health`
-  + homepage (no demo users/stats). The GitHub push of the refactor IS done
-  (see §4).
+- **Redeploy the refactor (DONE 2026-11-27 ~15:28 +06):** `npm run db:migrate:remote` — "No migrations to apply!" (already applied remotely). `npm run deploy` exit 0 — build 1664 modules, new JS bundle `index-CM5NCNpK.js`, live version `384444c9-364f-4505-b7aa-ba9cb11de141` at https://crush-and-confo.crush-and-confo.workers.dev. Verified: `/api/health` 200 `{"ok":true,"data":{"status":"ok","service":"crush-and-confo"}}`, homepage 200, `/api/posts` and `/api/confessions` return empty `{items: []}`, zero matches for Samiya / John Bay / 98K / 12K / 95K in the homepage, API responses and JS bundle. No demo data live.
 - **Admin account on the live site:** first admin only via `npm run
   seed:admin` against the remote DB — not yet created; no public admin
   registration exists (by design).
@@ -181,7 +257,7 @@ explicitly marked as not run.
 | 10 | Reports & blocks | **Done, live-tested locally (routes exercised in code review; report/block endpoints used by the frontend)** | `POST /api/reports`, `GET /api/reports/mine`, `/api/blocks/*` in `misc.ts`; admin review at `/admin/reports`. |
 | 11 | Admin console | **Done — gaps closed 2026-11-27 ~08:00 UTC** | Admin UI (8 routes, see "Admin UI" section) typechecks clean and calls the real `/api/admin/*` endpoints. Announcements, ban, post list, stats breakdowns, server-side search and health endpoints added and live-tested. |
 | 12 | Testing | **Done (unit 35/35), partial (e2e)** | Vitest **35/35 pass** (matching 10, validation 14, api-adapter 11 — new 2026-11-27). Playwright config + smoke test exist; **not runnable here** (no browser binary; download timed out — see test results). |
-| 13 | Deployment & docs | **Live deployed 2026-11-27 ~14:51 +06; refactor pushed to GitHub ~15:15 +06 but NOT yet redeployed (API token unavailable in deploy session)** | `wrangler.jsonc` (real D1/R2/KV IDs), `docs/DEPLOYMENT.md`, `docs/EMAIL.md`, `docs/SECURITY.md`, `docs/API.md`, `docs/ARCHITECTURE.md`, this file, `README.md`. Live URL: https://crush-and-confo.crush-and-confo.workers.dev (version `557045ce` after the blank-page fix — still the old demo version). The 2026-11-27 refactor is on GitHub (29 files + demoData.ts deleted) and built/tested locally (`npm run build` exit 0, Vitest 35/35); redeploy needs the Cloudflare API token supplied securely, then `npm run deploy`.
+| 13 | Deployment & docs | **Live deployed 2026-11-27 ~14:51 +06; refactor redeployed live ~15:28 +06 (version `384444c9`, no demo data)** | `wrangler.jsonc` (real D1/R2/KV IDs), `docs/DEPLOYMENT.md`, `docs/EMAIL.md`, `docs/SECURITY.md`, `docs/API.md`, `docs/ARCHITECTURE.md`, this file, `README.md`. Live URL: https://crush-and-confo.crush-and-confo.workers.dev (version `384444c9-364f-4505-b7aa-ba9cb11de141`, fresh no-demo version; `/api/health` 200, `/api/posts` and `/api/confessions` empty).
 
 ## Admin UI (Agent C)
 
@@ -406,6 +482,27 @@ via the user's device browser (tablet mode, user signed in):
   then `npm run deploy` and verify `/api/health` + homepage with no demo
   data. Until then the live site remains version `557045ce` (old demo
   version).
+- **Redeploy re-attempt 2026-11-27 ~15:17 +06 — STILL BLOCKED, same cause.**
+  Fresh tree re-verified (demoData.ts deleted; DiscoverCard, PhotoUpload,
+  uploads.ts, api-adapter test present; no Samiya / John Bay / 98K in
+  frontend source — the only hits are in the local-dev-only
+  `apps/worker/src/db/seed-data.ts`, which is never run against remote).
+  Live homepage re-checked 15:17 +06: still shows 98K+ / 12K+ / 95K+ / 56K+
+  stats and Samiya 19 Dhaka 92% Match — old demo version. `wrangler whoami`
+  still "not authenticated", no token in session env, no stored connector.
+  The redeploy subagent has no live-browser access and cannot create the new
+  token in the device browser itself; that step needs the parent/browser
+  agent. Then run `npm run db:migrate:remote` + `npm run deploy` with the
+  token as an env var (never in chat/files).
+- **Redeploy DONE 2026-11-27 ~15:28 +06.** Token supplied transiently as
+  `CLOUDFLARE_API_TOKEN` env var for the commands only (never stored in any
+  file). `npm run db:migrate:remote` — no migrations to apply. `npm run
+  deploy` exit 0 — version `384444c9-364f-4505-b7aa-ba9cb11de141`,
+  https://crush-and-confo.crush-and-confo.workers.dev. Verified:
+  `/api/health` 200, homepage 200 with new bundle `index-CM5NCNpK.js`,
+  `/api/posts` and `/api/confessions` empty `{items: []}`, zero Samiya /
+  John Bay / 98K / 12K / 95K in homepage, API responses and JS bundle.
+  Fresh no-demo version is live.
 
 ### 4. Publish to GitHub — repo EXISTS, empty, public
 The user created the repo manually on 2026-11-27T06:37:40Z (the earlier MCP

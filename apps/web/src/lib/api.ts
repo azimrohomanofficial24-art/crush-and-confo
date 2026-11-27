@@ -228,7 +228,7 @@ export const api = {
     const { user } = await apiFetch<{ user: any }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ emailOrUsername: email, password }) })
     return toUser(user)
   },
-  async register(form: { fullName: string; username: string; email: string; password: string; dob: string; gender: string; country: string; city: string }): Promise<User> {
+  async register(form: { fullName: string; username: string; email: string; password: string; dob: string; gender: string; country: string; city: string }): Promise<{ user: User; devVerificationToken?: string }> {
     const payload = {
       username: form.username,
       email: form.email,
@@ -238,14 +238,14 @@ export const api = {
       gender: GENDER_MAP[form.gender] ?? 'prefer_not_to_say',
       location: [form.city, form.country].filter(Boolean).join(', ') || undefined,
     }
-    const { user } = await apiFetch<{ user: any }>('/api/auth/register', { method: 'POST', body: JSON.stringify(payload) })
-    return toUser(user)
+    const data = await apiFetch<{ user: any; devVerificationToken?: string }>('/api/auth/register', { method: 'POST', body: JSON.stringify(payload) })
+    return { user: toUser(data.user), devVerificationToken: data.devVerificationToken }
   },
   async logout(): Promise<void> {
     try { await apiFetch('/api/auth/logout', { method: 'POST' }) } catch { /* already logged out */ }
   },
-  async forgotPassword(email: string): Promise<void> {
-    await apiFetch('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) })
+  async forgotPassword(email: string): Promise<{ sent: boolean; devResetToken?: string }> {
+    return apiFetch<{ sent: boolean; devResetToken?: string }>('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) })
   },
   async resetPassword(token: string, password: string): Promise<void> {
     if (!token) throw new ApiError(400, 'No reset token found in the link.')

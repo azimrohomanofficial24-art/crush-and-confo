@@ -77,7 +77,7 @@
     },
     "production": {
       "vars": {
-        "APP_URL": "https://crush-and-confo.pages.dev",
+        "APP_URL": "https://crush-and-confo.crush-and-confo.workers.dev",
         "RESEND_DEV_MODE": "false"
       }
       // Production D1/R2/KV bindings are inherited from the top level.

@@ -51,7 +51,7 @@ export default function Home() {
           </h2>
           <p className="mt-3 text-lg font-semibold text-white/90">{hero.sub}</p>
           <div className="mt-6 flex flex-wrap items-center gap-3">
-            <Link to="/explore" className="btn-gradient !bg-white !text-pink shadow-none">Start Exploring <ArrowRight className="h-4 w-4" /></Link>
+            <Link to="/explore" className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-bold text-pink shadow-lg transition hover:bg-lavender/60 active:scale-[0.98]">Start Exploring <ArrowRight className="h-4 w-4" /></Link>
             <button onClick={() => setHowOpen((v) => !v)} className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-white/50 px-5 py-2.5 text-sm font-semibold backdrop-blur hover:bg-white/10">
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-pink"><Play className="h-3.5 w-3.5 fill-pink" /></span> How it works
             </button>

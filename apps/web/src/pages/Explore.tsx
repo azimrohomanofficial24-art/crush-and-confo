@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Compass, Search } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -14,6 +14,9 @@ export default function Explore() {
   const [params, setParams] = useSearchParams()
   const q = params.get('q') || ''
   const [input, setInput] = useState(q)
+  // Keep the box in sync when the header search navigates here with a new
+  // query — the old code initialised from q once and then went stale.
+  useEffect(() => { setInput(q) }, [q])
   const search = useQuery({ queryKey: ['search', q], queryFn: () => api.search(q), enabled: q.length > 0 })
   const discover = useQuery({ queryKey: ['discover'], queryFn: () => api.discover(), enabled: !!user })
   const hashtags = useQuery({ queryKey: ['hashtags'], queryFn: () => api.trendingHashtags() })

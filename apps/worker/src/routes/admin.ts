@@ -7,7 +7,7 @@ import { requireAdmin, audit } from '../auth/middleware.js';
 import { adminLoginSchema } from '../lib/validation.js';
 import { parseBody, safeUser, countRows } from '../lib/helpers.js';
 import { hashPassword, verifyPassword } from '../auth/password.js';
-import { sessionCookieHeader, clearSessionCookieHeader } from '../auth/session.js';
+import { sessionCookieHeader, clearSessionCookieHeader, requestIsHttps } from '../auth/session.js';
 import { getSecret } from '../auth/middleware.js';
 import { pageLimit } from '../lib/pagination.js';
 
@@ -20,11 +20,11 @@ r.post('/admin/login', async (c) => {
   const [admin] = await db.select().from(adminUsers).where(eq(adminUsers.email, parsed.data.email)).limit(1);
   if (!admin || !(await verifyPassword(parsed.data.password, admin.passwordHash))) return fail(c, 401, 'invalid_credentials', 'Invalid admin credentials');
   await db.update(adminUsers).set({ lastLoginAt: Date.now() }).where(eq(adminUsers.id, admin.id));
-  c.header('Set-Cookie', sessionCookieHeader(getSecret(c), `admin:${admin.id}`));
+  c.header('Set-Cookie', sessionCookieHeader(getSecret(c), `admin:${admin.id}`, requestIsHttps(c)));
   const { passwordHash: _p, ...rest } = admin as any;
   return ok(c, { admin: rest });
 });
-r.post('/admin/logout', (c) => { c.header('Set-Cookie', clearSessionCookieHeader()); return ok(c, { loggedOut: true }); });
+r.post('/admin/logout', (c) => { c.header('Set-Cookie', clearSessionCookieHeader(requestIsHttps(c))); return ok(c, { loggedOut: true }); });
 r.get('/admin/me', requireAdmin, async (c) => {
   const admin: any = (c as any).get('admin'); const { passwordHash: _p, ...rest } = admin; return ok(c, { admin: rest });
 });

@@ -40,11 +40,20 @@ export function DiscoverCard({
     <article className="glass overflow-hidden" aria-label={`Profile of ${user.fullName}`}>
       <Link to={`/profile/${user.username}`} className="relative block aspect-[3/4] w-full overflow-hidden">
         <DiscoverPhoto user={user} />
-        {/* High-contrast heart badge: solid pink heart on a white chip — never
-            white-on-pale, so it is clearly visible on any photo. */}
-        <span className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-glass ring-1 ring-pink/30" aria-label="Like">
-          <Heart className="h-5 w-5 fill-pink text-pink" />
-        </span>
+        {/* Real Like button (was a decorative span: it looked like a Like
+            control but did nothing except navigate to the profile). Only
+            shown when a like handler exists. */}
+        {onLike && (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onLike(user.id) }}
+            className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-glass ring-1 ring-pink/30 transition hover:scale-110 disabled:opacity-50"
+            aria-label={`Like ${user.fullName}`}
+          >
+            <Heart className="h-5 w-5 fill-pink text-pink" />
+          </button>
+        )}
         {user.matchPercent != null && (
           <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-pink shadow-soft">{user.matchPercent}% Match</span>
         )}

@@ -1,13 +1,26 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Eye, EyeOff, Heart } from 'lucide-react'
-import { api } from '../lib/api'
+import { api, ApiError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { AuthLayout } from '../components/Layout'
 import { Spinner } from '../components/ui'
+
+/** Turn a failed API call into the honest message the user should see.
+ *  The old code swallowed every failure as "invalid password" / "already
+ *  taken", so a rate-limit (429), a validation error or a network failure all
+ *  looked like a wrong password to the user. */
+function serverMessage(e: unknown, fallback: string): string {
+  if (e instanceof ApiError) {
+    if (e.status === 429) return 'Too many attempts. Please wait a minute and try again.'
+    if (e.status === 0) return 'Could not reach the server. Check your connection and try again.'
+    if (e.message) return e.message
+  }
+  return fallback
+}
 
 const emailSchema = z.string().email('Enter a valid email address')
 const passwordSchema = z.string().min(8, 'Password must be at least 8 characters')
@@ -34,7 +47,7 @@ function PasswordInput({ value, onChange, placeholder }: { value: string; onChan
   )
 }
 
-const loginSchema = z.object({ email: emailSchema, password: z.string().min(1, 'Password is required') })
+const loginSchema = z.object({ email: z.string().min(1, 'Enter your email or username'), password: z.string().min(1, 'Password is required') })
 type LoginForm = z.infer<typeof loginSchema>
 
 export function Login() {
@@ -45,14 +58,14 @@ export function Login() {
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginForm>({ resolver: zodResolver(loginSchema) })
   const onSubmit = async (v: LoginForm) => {
     setServerError('')
-    try { await login(v.email, v.password); navigate('/dashboard') } catch { setServerError('Invalid email or password. Please try again.') }
+    try { await login(v.email, v.password); navigate('/dashboard') } catch (e) { setServerError(serverMessage(e, 'Invalid email/username or password. Please try again.')) }
   }
   return (
     <AuthLayout>
       <h1 className="font-display text-2xl font-extrabold text-ink">Welcome back</h1>
       <p className="mt-1 text-sm text-muted">Log in to confess, connect and match.</p>
       <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
-        <Field label="Email" error={errors.email?.message}><input type="email" className="input" placeholder="you@example.com" {...register('email')} /></Field>
+        <Field label="Email or username" error={errors.email?.message}><input type="text" autoComplete="username" className="input" placeholder="you@example.com or your_username" {...register('email')} /></Field>
         <Field label="Password" error={errors.password?.message}>
           <div className="relative">
             <input type={showPw ? 'text' : 'password'} className="input pr-11" placeholder="Your password" {...register('password')} aria-label="Password" />
@@ -98,7 +111,20 @@ export function Register() {
   const password = watch('password') || ''
   const onSubmit = async (v: RegisterForm) => {
     setServerError('')
-    try { await api.register(v); navigate('/verify-email') } catch { setServerError('Registration failed. The username or email may already be taken.') }
+    try {
+      const res = await api.register(v)
+      // While email delivery is not configured the server returns a
+      // one-time verification token instead of sending an email. Hand it to
+      // the verify page (and keep a copy for this tab only) so the user can
+      // verify right now instead of waiting for an email that will never
+      // arrive. Login is NOT blocked on verification either way.
+      if (res.devVerificationToken) {
+        try { sessionStorage.setItem('cc-verify-token', res.devVerificationToken) } catch { /* private mode */ }
+        navigate('/verify-email', { state: { devToken: res.devVerificationToken } })
+      } else {
+        navigate('/verify-email')
+      }
+    } catch (e) { setServerError(serverMessage(e, 'Registration failed. The username or email may already be taken.')) }
   }
   return (
     <AuthLayout>
@@ -111,7 +137,7 @@ export function Register() {
         <Field label="Password" error={errors.password?.message}><PasswordInput value={password} onChange={(v) => setValue('password', v)} placeholder="At least 8 characters" /></Field>
         <Field label="Confirm password" error={errors.confirmPassword?.message}><input type="password" className="input" placeholder="Repeat your password" {...register('confirmPassword')} /></Field>
         <Field label="Date of birth" error={errors.dob?.message}><input type="date" className="input" {...register('dob')} /></Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Gender" error={errors.gender?.message}>
             <select className="input" {...register('gender')}><option value="">Select</option><option>Female</option><option>Male</option><option>Non-binary</option><option>Prefer not to say</option></select>
           </Field>
@@ -136,16 +162,31 @@ export function Register() {
 export function ForgotPassword() {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
+  const [devToken, setDevToken] = useState<string | null>(null)
   const [error, setError] = useState('')
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setError('')
-    try { await api.forgotPassword(email); setSent(true) } catch { setError('Could not send the reset link. Please try again.') }
+    try {
+      const res = await api.forgotPassword(email)
+      setDevToken(res.devResetToken ?? null)
+      setSent(true)
+    } catch (err) { setError(serverMessage(err, 'Could not send the reset link. Please try again.')) }
   }
   return (
     <AuthLayout>
       <h1 className="font-display text-2xl font-extrabold text-ink">Forgot password?</h1>
       <p className="mt-1 text-sm text-muted">Enter your email and we will send you a password reset link.</p>
-      {sent ? <p className="mt-6 rounded-2xl bg-success/10 p-4 font-semibold text-success" role="status">Reset link sent to {email}. Check your inbox (and spam folder).</p> : (
+      {sent ? (
+        devToken ? (
+          <div className="mt-6 rounded-2xl bg-lavender/50 p-4" role="status">
+            <p className="font-semibold text-ink">Email delivery is still being set up, so no email was sent.</p>
+            <p className="mt-1 text-sm text-muted">Use this one-time link to reset your password now — it expires in 1 hour.</p>
+            <Link to={`/reset-password?token=${devToken}`} className="btn-gradient mt-4 w-full">Reset my password now</Link>
+          </div>
+        ) : (
+          <p className="mt-6 rounded-2xl bg-success/10 p-4 font-semibold text-success" role="status">Reset link sent to {email}. Check your inbox (and spam folder).</p>
+        )
+      ) : (
         <form onSubmit={submit} className="mt-6 space-y-4">
           <div><label className="label" htmlFor="fp-email">Email</label><input id="fp-email" type="email" required className="input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" /></div>
           {error && <p className="text-sm text-error" role="alert">{error}</p>}
@@ -153,7 +194,6 @@ export function ForgotPassword() {
         </form>
       )}
       <p className="mt-4 text-center text-sm text-muted"><Link to="/login" className="font-semibold text-purple">Back to log in</Link></p>
-      <p className="mt-3 text-center text-xs text-muted">Email delivery is still being set up — if the reset email does not arrive, please try again later.</p>
     </AuthLayout>
   )
 }
@@ -170,7 +210,7 @@ export function ResetPassword() {
     e.preventDefault()
     if (password.length < 8) { setError('Password must be at least 8 characters.'); return }
     if (password !== confirm) { setError('Passwords do not match.'); return }
-    try { await api.resetPassword(token, password); setDone(true); setTimeout(() => navigate('/login'), 2000) } catch { setError('Reset link is invalid or expired. Request a new one.') }
+    try { await api.resetPassword(token, password); setDone(true); setTimeout(() => navigate('/login'), 2000) } catch (e) { setError(serverMessage(e, 'Reset link is invalid or expired. Request a new one.')) }
   }
   return (
     <AuthLayout>
@@ -190,14 +230,25 @@ export function ResetPassword() {
 
 export function VerifyEmail() {
   const [params] = useSearchParams()
+  const location = useLocation()
   const token = params.get('token') || ''
+  // While email delivery is not configured, registration hands the
+  // one-time token to this page directly (navigation state + this tab's
+  // session storage) so verification can finish here — no email needed.
+  // Login is never blocked on verification, so this is a convenience,
+  // not a gate.
+  const devToken = ((location.state as { devToken?: string } | null)?.devToken) || (() => { try { return sessionStorage.getItem('cc-verify-token') || '' } catch { return '' } })()
   const [status, setStatus] = useState<'idle' | 'checking' | 'ok' | 'error'>('idle')
-  const check = async () => {
-    if (!token) { setStatus('error'); return }
+  const [devError, setDevError] = useState('')
+  const check = async (tok: string) => {
     setStatus('checking')
-    try { await api.verifyEmail(token); setStatus('ok') } catch { setStatus('error') }
+    try {
+      await api.verifyEmail(tok)
+      try { sessionStorage.removeItem('cc-verify-token') } catch { /* ignore */ }
+      setStatus('ok')
+    } catch (e) { setStatus('error'); setDevError(serverMessage(e, 'Verification failed.')) }
   }
-  useEffect(() => { if (token) void check() }, [token])
+  useEffect(() => { if (token) void check(token) }, [token])
   return (
     <AuthLayout>
       <h1 className="font-display text-2xl font-extrabold text-ink">Verify your email</h1>
@@ -205,9 +256,17 @@ export function VerifyEmail() {
       {status === 'ok' ? (
         <p className="mt-6 rounded-2xl bg-success/10 p-4 font-semibold text-success" role="status">Email verified! Welcome to Crush and Confo. <Link className="underline" to="/login">Log in</Link></p>
       ) : status === 'error' ? (
-        <p className="mt-6 rounded-2xl bg-error/10 p-4 font-semibold text-error" role="alert">This verification link is invalid or expired. Please register again or contact support.</p>
+        <p className="mt-6 rounded-2xl bg-error/10 p-4 font-semibold text-error" role="alert">This verification link is invalid or expired. {devError} Please register again or contact support.</p>
       ) : !token ? (
-        <p className="mt-6 rounded-2xl bg-lavender/50 p-4 text-sm text-muted">No verification link was opened. Check your email for the link — email delivery is still being set up, so if it has not arrived yet, you can still <Link className="font-semibold text-purple" to="/login">log in</Link> and verify later.</p>
+        devToken ? (
+          <div className="mt-6 rounded-2xl bg-lavender/50 p-4" role="status">
+            <p className="font-semibold text-ink">Email delivery is still being set up, so no verification email was sent.</p>
+            <p className="mt-1 text-sm text-muted">You can verify your email right now with one tap — or just <Link className="font-semibold text-purple" to="/login">log in</Link>, verification is not required to log in.</p>
+            <button className="btn-gradient mt-4 w-full" disabled={status === 'checking'} onClick={() => void check(devToken)}>{status === 'checking' ? <Spinner /> : 'Verify my email now'}</button>
+          </div>
+        ) : (
+          <p className="mt-6 rounded-2xl bg-lavender/50 p-4 text-sm text-muted">No verification link was opened. Check your email for the link — email delivery is still being set up, so if it has not arrived yet, you can still <Link className="font-semibold text-purple" to="/login">log in</Link> and verify later.</p>
+        )
       ) : (
         <p className="mt-6 rounded-2xl bg-lavender/50 p-4 text-sm text-muted">Verifying your email…</p>
       )}

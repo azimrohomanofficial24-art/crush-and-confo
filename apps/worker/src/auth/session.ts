@@ -20,9 +20,17 @@ export function verifySession(secret: string, cookie: string | undefined): { id:
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
   return { id };
 }
-export function sessionCookieHeader(secret: string, id: string): string {
-  return `${SESSION_COOKIE}=${signSession(secret, id)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${7 * 24 * 3600}${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`;
+export function sessionCookieHeader(secret: string, id: string, secure = false): string {
+  // Secure only on https (production). On plain http (local dev) a Secure
+  // cookie would never be stored, which silently breaks login. Never decide
+  // this from process.env.NODE_ENV: on Workers it is unset, so the old code
+  // never set Secure in production either.
+  return `${SESSION_COOKIE}=${signSession(secret, id)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${7 * 24 * 3600}${secure ? '; Secure' : ''}`;
 }
-export function clearSessionCookieHeader(): string {
-  return `${SESSION_COOKIE}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`;
+export function clearSessionCookieHeader(secure = false): string {
+  return `${SESSION_COOKIE}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0${secure ? '; Secure' : ''}`;
+}
+/** True when this request arrived over https — the only reliable signal on Workers. */
+export function requestIsHttps(c: { req: { url: string } }): boolean {
+  try { return new URL(c.req.url).protocol === 'https:'; } catch { return false; }
 }
