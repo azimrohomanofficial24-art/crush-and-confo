@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -68,7 +68,7 @@ export function Login() {
         <Link to="/forgot-password" className="font-semibold text-purple">Forgot password?</Link>
         <Link to="/register" className="font-semibold text-purple">Create account</Link>
       </div>
-      <p className="mt-4 rounded-2xl bg-lavender/50 p-3 text-xs text-muted"><Heart className="mr-1 inline h-3.5 w-3.5 text-pink" /> Demo mode: log in with any email and a password of 6+ characters (e.g. john_bay@example.com) while the live API is not running.</p>
+      <p className="mt-4 rounded-2xl bg-lavender/50 p-3 text-xs text-muted"><Heart className="mr-1 inline h-3.5 w-3.5 fill-pink text-pink" /> Crush and Confo is for adults 18+ only. Your date of birth is checked by the server when you register.</p>
     </AuthLayout>
   )
 }
@@ -85,7 +85,6 @@ const registerSchema = z.object({
     return age >= 18
   }, 'You must be at least 18 years old'),
   gender: z.string().min(1, 'Select your gender'),
-  interestedIn: z.string().min(1, 'Select who you are interested in'),
   country: z.string().min(2, 'Enter your country'),
   city: z.string().min(2, 'Enter your city'),
   terms: z.boolean().refine((v) => v, 'You must accept the Terms and confirm you are 18+'),
@@ -95,7 +94,7 @@ type RegisterForm = z.infer<typeof registerSchema>
 export function Register() {
   const navigate = useNavigate()
   const [serverError, setServerError] = useState('')
-  const { register, handleSubmit, formState: { errors, isSubmitting }, setValue, watch } = useForm<RegisterForm>({ resolver: zodResolver(registerSchema), defaultValues: { gender: '', interestedIn: '', country: 'Bangladesh', city: '' } })
+  const { register, handleSubmit, formState: { errors, isSubmitting }, setValue, watch } = useForm<RegisterForm>({ resolver: zodResolver(registerSchema), defaultValues: { gender: '', country: 'Bangladesh', city: '' } })
   const password = watch('password') || ''
   const onSubmit = async (v: RegisterForm) => {
     setServerError('')
@@ -104,10 +103,10 @@ export function Register() {
   return (
     <AuthLayout>
       <h1 className="font-display text-2xl font-extrabold text-ink">Create your account</h1>
-      <p className="mt-1 text-sm text-muted">Join 98K+ people confessing, connecting and matching. You must be 18+ — the server checks your date of birth.</p>
+      <p className="mt-1 text-sm text-muted">Confess, connect and match with real people across Bangladesh. You must be 18+ — the server checks your date of birth.</p>
       <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
-        <Field label="Full name" error={errors.fullName?.message}><input className="input" placeholder="John Bay" {...register('fullName')} /></Field>
-        <Field label="Username" error={errors.username?.message}><input className="input" placeholder="john_bay" {...register('username')} /></Field>
+        <Field label="Full name" error={errors.fullName?.message}><input className="input" placeholder="Your full name" {...register('fullName')} /></Field>
+        <Field label="Username" error={errors.username?.message}><input className="input" placeholder="your_username" {...register('username')} /></Field>
         <Field label="Email" error={errors.email?.message}><input type="email" className="input" placeholder="you@example.com" {...register('email')} /></Field>
         <Field label="Password" error={errors.password?.message}><PasswordInput value={password} onChange={(v) => setValue('password', v)} placeholder="At least 8 characters" /></Field>
         <Field label="Confirm password" error={errors.confirmPassword?.message}><input type="password" className="input" placeholder="Repeat your password" {...register('confirmPassword')} /></Field>
@@ -116,13 +115,10 @@ export function Register() {
           <Field label="Gender" error={errors.gender?.message}>
             <select className="input" {...register('gender')}><option value="">Select</option><option>Female</option><option>Male</option><option>Non-binary</option><option>Prefer not to say</option></select>
           </Field>
-          <Field label="Interested in" error={errors.interestedIn?.message}>
-            <select className="input" {...register('interestedIn')}><option value="">Select</option><option>Female</option><option>Male</option><option>Everyone</option></select>
-          </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Country" error={errors.country?.message}><input className="input" placeholder="Bangladesh" {...register('country')} /></Field>
           <Field label="City" error={errors.city?.message}><input className="input" placeholder="Dhaka" {...register('city')} /></Field>
+        </div>
+        <div>
+          <Field label="Country" error={errors.country?.message}><input className="input" placeholder="Bangladesh" {...register('country')} /></Field>
         </div>
         <label className="flex items-start gap-2 text-sm text-ink/85">
           <input type="checkbox" className="mt-1 accent-purple" {...register('terms')} />
@@ -157,6 +153,7 @@ export function ForgotPassword() {
         </form>
       )}
       <p className="mt-4 text-center text-sm text-muted"><Link to="/login" className="font-semibold text-purple">Back to log in</Link></p>
+      <p className="mt-3 text-center text-xs text-muted">Email delivery is still being set up — if the reset email does not arrive, please try again later.</p>
     </AuthLayout>
   )
 }
@@ -196,9 +193,11 @@ export function VerifyEmail() {
   const token = params.get('token') || ''
   const [status, setStatus] = useState<'idle' | 'checking' | 'ok' | 'error'>('idle')
   const check = async () => {
+    if (!token) { setStatus('error'); return }
     setStatus('checking')
-    try { await api.verifyEmail(token || 'demo-token'); setStatus('ok') } catch { setStatus('error') }
+    try { await api.verifyEmail(token); setStatus('ok') } catch { setStatus('error') }
   }
+  useEffect(() => { if (token) void check() }, [token])
   return (
     <AuthLayout>
       <h1 className="font-display text-2xl font-extrabold text-ink">Verify your email</h1>
@@ -207,8 +206,10 @@ export function VerifyEmail() {
         <p className="mt-6 rounded-2xl bg-success/10 p-4 font-semibold text-success" role="status">Email verified! Welcome to Crush and Confo. <Link className="underline" to="/login">Log in</Link></p>
       ) : status === 'error' ? (
         <p className="mt-6 rounded-2xl bg-error/10 p-4 font-semibold text-error" role="alert">This verification link is invalid or expired. Please register again or contact support.</p>
+      ) : !token ? (
+        <p className="mt-6 rounded-2xl bg-lavender/50 p-4 text-sm text-muted">No verification link was opened. Check your email for the link — email delivery is still being set up, so if it has not arrived yet, you can still <Link className="font-semibold text-purple" to="/login">log in</Link> and verify later.</p>
       ) : (
-        <button className="btn-gradient mt-6 w-full" disabled={status === 'checking'} onClick={check}>{status === 'checking' ? <Spinner /> : 'Verify my email'}</button>
+        <p className="mt-6 rounded-2xl bg-lavender/50 p-4 text-sm text-muted">Verifying your email…</p>
       )}
       <p className="mt-4 text-center text-sm text-muted">Didn't get the email? Check spam, or <Link to="/register" className="font-semibold text-purple">register again</Link>.</p>
     </AuthLayout>
