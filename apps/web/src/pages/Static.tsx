@@ -1,6 +1,5 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Heart, Mail, Send, ShieldCheck, Sparkles } from 'lucide-react'
+import { Heart, Mail, ShieldCheck, Sparkles } from 'lucide-react'
 
 function Page({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -28,22 +27,11 @@ export function About() {
 }
 
 export function Contact() {
-  const [sent, setSent] = useState(false)
-  const [form, setForm] = useState({ name: '', email: '', message: '' })
   return (
     <Page title="Contact us">
-      <P>Questions, feedback or a safety concern? Write to us — we read every message.</P>
-      {sent ? (
-        <p className="rounded-2xl bg-success/10 p-4 font-semibold text-success" role="status">Thank you! Your message has been sent. We will reply to {form.email}.</p>
-      ) : (
-        <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); setSent(true) }}>
-          <div><label className="label" htmlFor="c-name">Name</label><input id="c-name" className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-          <div><label className="label" htmlFor="c-email">Email</label><input id="c-email" type="email" className="input" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-          <div><label className="label" htmlFor="c-msg">Message</label><textarea id="c-msg" rows={4} className="input resize-none" required value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} /></div>
-          <button className="btn-gradient" type="submit"><Send className="h-4 w-4" /> Send message</button>
-        </form>
-      )}
-      <P><Mail className="mr-1 inline h-4 w-4" /> For urgent safety issues, use Report on the relevant post or profile — moderators review reports first.</P>
+      <P>Questions, feedback or a safety concern? We read every message.</P>
+      <P><Mail className="mr-1 inline h-4 w-4" /> Email support is being set up — until then, the fastest way to reach a moderator is to use <strong>Report</strong> on the relevant post, confession or profile. Reports are reviewed first, and urgent safety issues go to the top of the queue.</P>
+      <P>For account help (log-in trouble, deleted account, verification), try the <Link className="font-semibold text-purple" to="/forgot-password">forgot-password</Link> flow, or read our <Link className="font-semibold text-purple" to="/safety">Safety</Link> and <Link className="font-semibold text-purple" to="/guidelines">Community Guidelines</Link> pages.</P>
     </Page>
   )
 }
@@ -59,7 +47,7 @@ export function Privacy() {
       <H2>Your control</H2>
       <P>You can edit your profile, block or report anyone, download or delete your account from Settings. Deleting your account removes your profile, posts and messages.</P>
       <H2>Cookies & sessions</H2>
-      <P>Sign-in uses a secure HttpOnly session cookie. In demo mode only, a dev session marker is kept in your browser's session storage — production never stores tokens in localStorage.</P>
+      <P>Sign-in uses a secure HttpOnly session cookie. Production never stores tokens in localStorage.</P>
     </Page>
   )
 }
