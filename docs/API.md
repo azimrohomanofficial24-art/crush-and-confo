@@ -108,7 +108,7 @@ returns 503 with code `unavailable`.
 | GET | `/api/community/followers/:userId` | — | Followers |
 | GET | `/api/community/following/:userId` | — | Following |
 | POST | `/api/posts` | user | Create (`postCreateSchema`, body 1–2000 chars) |
-| GET | `/api/posts` | optional | List posts |
+| GET | `/api/posts` | optional | List posts (`?authorId=` filters by author) |
 | GET | `/api/posts/:id` | optional | One post |
 | DELETE | `/api/posts/:id` | user | Delete own post |
 | POST | `/api/posts/:id/like` | user | Like post |
@@ -126,10 +126,11 @@ author id is kept server-side for admin investigation only.
 
 | Method | Route | Auth | Notes |
 |---|---|---|---|
-| GET | `/api/confessions` | optional | List (`?sort=latest\|trending`, cursor pagination) |
+| GET | `/api/confessions` | optional | List (`?sort=latest\|trending`, `?category=` filter, cursor pagination) |
 | GET | `/api/confessions/trending` | optional | Redirects to list with `sort=trending` |
 | GET | `/api/confessions/latest` | optional | Redirects to list with `sort=latest` |
 | GET | `/api/confessions/mine` | user | Own confessions |
+| GET | `/api/confessions/saved/mine` | user | Saved confessions |
 | GET | `/api/confessions/:id` | optional | One confession |
 | POST | `/api/confessions` | user | Create (`confessionCreateSchema`, body 1–2000 chars) |
 | DELETE | `/api/confessions/:id` | user | Delete own confession |
@@ -153,6 +154,13 @@ author id is kept server-side for admin investigation only.
 | GET | `/api/blocks` | user | Blocked users |
 | POST | `/api/blocks` | user | Block (`blockSchema`) |
 | DELETE | `/api/blocks/:userId` | user | Unblock |
+
+## Uploads — `/api/uploads` (profile photos, stored in R2)
+
+| Method | Route | Auth | Notes |
+|---|---|---|---|
+| POST | `/api/uploads/avatar` | user | Multipart form-data, field `file`. JPG/PNG/WebP/GIF ≤ 5 MB. Stored in the R2 bucket bound as `UPLOADS`; the profile's `avatarUrl` is set to `/api/uploads/<key>`. Local dev (no R2 binding) stores the file under `data/uploads/`. Returns `{ url }`. |
+| GET | `/api/uploads/:key` | — | Serves a stored photo (avatars are public profile data). `Cache-Control: public, max-age=86400`. |
 
 ## Admin — `/api/admin` (separate login, `admin_users` table)
 
