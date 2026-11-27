@@ -1,20 +1,23 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Mail, Send, ShieldAlert } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, timeAgo } from '../lib/api'
-import { CURRENT_USER_ID } from '../lib/demoData'
+import { useAuth } from '../lib/auth'
 import { Avatar, EmptyState, ErrorState, LoadingList, Spinner } from '../components/ui'
 
 export default function Messages() {
   const qc = useQueryClient()
+  const { user } = useAuth()
+  const [params] = useSearchParams()
+  const requested = params.get('active')
   const [activeId, setActiveId] = useState<string | null>(null)
   const [text, setText] = useState('')
   const convs = useQuery({ queryKey: ['conversations'], queryFn: () => api.conversations() })
-  const active = (convs.data || []).find((c) => c.id === activeId) || (convs.data || [])[0]
+  const active = (convs.data || []).find((c) => c.id === (activeId || requested)) || (convs.data || [])[0]
   const msgs = useQuery({ queryKey: ['messages', active?.id], queryFn: () => api.messages(active!.id), enabled: !!active })
   useEffect(() => {
-    if (active) api.markConversationRead(active.id).then(() => qc.invalidateQueries({ queryKey: ['conversations'] }))
+    if (active) api.markConversationRead(active.id).then(() => qc.invalidateQueries({ queryKey: ['conversations'] })).catch(() => { /* ignore */ })
   }, [active?.id])
   const send = useMutation({
     mutationFn: () => api.sendMessage(active!.id, text.trim()),
@@ -36,9 +39,8 @@ export default function Messages() {
                 <Avatar user={c.otherUser} size={48} />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center justify-between gap-2"><span className="truncate font-semibold text-ink">{c.otherUser.fullName}</span><span className="shrink-0 text-[11px] text-muted">{timeAgo(c.lastMessageAt)}</span></span>
-                  <span className="block truncate text-sm text-muted">{c.lastMessage}</span>
+                  <span className="block truncate text-sm text-muted">{c.lastMessage || 'Say hello!'}</span>
                 </span>
-                {c.unread > 0 && <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-pink text-[10px] font-bold text-white">{c.unread}</span>}
               </button>
             ))}
           </section>
@@ -49,13 +51,13 @@ export default function Messages() {
                   <Link to={`/profile/${active.otherUser.username}`}><Avatar user={active.otherUser} size={44} /></Link>
                   <div className="flex-1">
                     <Link to={`/profile/${active.otherUser.username}`} className="font-semibold text-ink hover:text-purple">{active.otherUser.fullName}</Link>
-                    <p className="text-xs text-muted">{active.otherUser.online ? 'Online now' : 'Offline'} · Matched {timeAgo(active.matchedAt)}</p>
+                    <p className="text-xs text-muted">Matched {timeAgo(active.matchedAt)}</p>
                   </div>
                   <Link to={`/profile/${active.otherUser.username}`} className="btn-ghost !min-h-[36px] !px-3 !py-1.5 text-xs">View profile</Link>
                 </div>
                 <div className="flex-1 space-y-3 overflow-y-auto py-4" aria-live="polite">
-                  {msgs.isLoading ? <p className="text-sm text-muted">Loading messages…</p> : (msgs.data || []).map((m) => {
-                    const mine = m.senderId === CURRENT_USER_ID
+                  {msgs.isLoading ? <p className="text-sm text-muted">Loading messages…</p> : (msgs.data || []).length === 0 ? <p className="text-center text-sm text-muted">No messages yet — say hello!</p> : (msgs.data || []).map((m) => {
+                    const mine = m.senderId === user?.id
                     return (
                       <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[80%] rounded-3xl px-4 py-2.5 text-sm ${mine ? 'rounded-br-md bg-gradient-to-r from-pink to-purple text-white' : 'rounded-bl-md bg-lavender/60 text-ink'}`}>
