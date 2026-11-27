@@ -1,0 +1,39 @@
+{
+  "description": "Crush and Confo \u2014 Confess. Connect. Match. A social + confession + matching web platform.",
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0",
+    "wrangler": "^3.95.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "name": "crush-and-confo",
+  "private": true,
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "build:web": "npm run build --workspace=apps/web",
+    "build:worker": "npm run build --workspace=apps/worker",
+    "db:migrate:local": "wrangler d1 migrations apply crush-and-confo-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply crush-and-confo-db --remote",
+    "deploy": "npm run build && wrangler deploy",
+    "dev": "npm run dev --workspace=apps/web",
+    "dev:all": "npm run dev --workspace=apps/web & npm run dev --workspace=apps/worker",
+    "dev:worker": "npm run dev --workspace=apps/worker",
+    "preview": "npm run build --workspace=apps/web && wrangler pages dev apps/web/dist",
+    "seed": "npm run seed --workspace=apps/worker",
+    "seed:admin": "npm run seed:admin --workspace=apps/worker",
+    "test": "vitest run --config tests/vitest.config.ts",
+    "test:e2e": "playwright test --config tests/playwright.config.ts",
+    "test:watch": "vitest --config tests/vitest.config.ts",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "type": "module",
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/web",
+    "apps/worker",
+    "packages/*"
+  ]
+}
