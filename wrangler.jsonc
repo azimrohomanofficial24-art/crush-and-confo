@@ -21,7 +21,7 @@
     {
       "binding": "DB",
       "database_name": "crush-and-confo-db",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "database_id": "03858f2f-6201-497b-a1e0-5e6e992fa40e",
       "migrations_dir": "migrations"
     }
   ],
@@ -40,7 +40,7 @@
   "kv_namespaces": [
     {
       "binding": "CACHE",
-      "id": "REPLACE_WITH_KV_NAMESPACE_ID"
+      "id": "c92648e841a7445abaeecf0b2118a059"
     }
   ],
 
