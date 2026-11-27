@@ -11,9 +11,13 @@ join the community, message mutual matches, and get notified.
   `docs/design-references/reference-a-white-glass-dashboard.png`.
 - **Strictly 18+.** Age is calculated server-side from date of birth;
   registration is rejected if under 18.
-- **Status:** built and tested locally; first GitHub push in progress to
+- **Status:** live at **https://crush-and-confo.crush-and-confo.workers.dev**
+  (deployed 2026-11-27, D1/R2/KV live; production database is fresh and empty —
+  **no demo data anywhere**). GitHub:
   [azimrohomanofficial24-art/crush-and-confo](https://github.com/azimrohomanofficial24-art/crush-and-confo)
-  (public). No live Cloudflare deployment yet — see [docs/STATUS.md](docs/STATUS.md) for the exact remaining steps.
+  (public). The 2026-11-27 no-demo-data + photo-led Discover refactor is built
+  and tested locally and is **not yet redeployed** — see
+  [docs/STATUS.md](docs/STATUS.md) for what is live vs. pending.
 
 ## Stack
 
@@ -33,8 +37,9 @@ apps/web/            Frontend (Vite + React). Admin UI: src/pages/admin/**, src/
 apps/worker/         Backend (Hono). Routes in src/routes/, DB in src/db/, matching in src/matching/
 packages/shared/     Shared types
 packages/validation/ Zod schemas (registration, posts, confessions, admin login, …)
-migrations/          D1/SQLite migrations (0001_initial.sql)
-scripts/             Seed scripts (demo data + first admin)
+migrations/          D1/SQLite migrations (0001_initial.sql, 0002_announcements.sql)
+scripts/             Seed scripts — LOCAL DEV ONLY (demo users + first admin).
+                     Never seed demo users into the remote/production database.
 tests/               Vitest unit tests + Playwright smoke test
 docs/                Architecture, API, deployment, email, security, status
 wrangler.jsonc       Cloudflare Workers + Static Assets config (D1/R2/KV/DO bindings)
@@ -61,15 +66,19 @@ npm run dev
 npm run dev:worker
 ```
 
-### Seed demo data + first admin
+### Seed data (local dev only) + first admin
 
 ```bash
-npm run seed          # demo users (John Bay @john_bay, Samiya, 19, Dhaka),
-                      # sample confessions / posts / matches / messages / notifications
+npm run seed          # LOCAL DEV ONLY: demo users, sample confessions / posts /
+                      # matches / messages / notifications, into the LOCAL SQLite
+                      # file. NEVER run against the remote D1 database — the
+                      # live site must stay fresh with no demo data.
 npm run seed:admin    # creates the FIRST admin account.
                       # Prints a ONE-TIME password to the terminal only.
                       # Usage: npm run seed:admin -- admin@example.com "Admin Name"
                       # There is NO public admin registration form.
+                      # For the LIVE site, run this against the remote DB only
+                      # when the admin account is needed (see docs/STATUS.md).
 ```
 
 Admin login lives at `/admin/login` (separate from user login). The admin
@@ -139,11 +148,17 @@ never expose the author in public interfaces.
 
 ## Known limitations
 
-- Admin: the backend does not yet expose announcements, a ban endpoint, an
-  admin post list, or stats breakdowns (active/verified/suspended users,
-  matches, messages). The admin UI shows those gaps honestly instead of
-  inventing data — details in [docs/STATUS.md](docs/STATUS.md).
+- **No demo data, by design.** The live site shows only real user content.
+  Empty states are honest ("No posts yet", "No matches yet"). The local seed
+  scripts are for local development only.
 - Email is dev-mode only until a Resend domain is verified.
 - The first deployment uses a free Cloudflare address; custom domain comes later.
-- `apps/web` has no `src/main.tsx` / `src/App.tsx` yet (Agent A, in progress),
-  so `npm run build` for the web workspace cannot succeed until that lands.
+- Profile photos upload to R2 and are served by the Worker
+  (`POST /api/uploads/avatar`, `GET /api/uploads/:key`). Photo upload on
+  *posts* is not built yet — the Create Post Photo button was removed rather
+  than left fake.
+- Premium / payments are not built — there is no Premium upsell anywhere in
+  the UI (no checkout, no paid features).
+- Playwright smoke test has not run yet (no browser binary in this environment).
+- The 2026-11-27 refactor (this repo state) is not yet redeployed or pushed to
+  GitHub — see [docs/STATUS.md](docs/STATUS.md).
