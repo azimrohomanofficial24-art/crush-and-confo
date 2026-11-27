@@ -9,6 +9,7 @@ import matching from './routes/matching.js';
 import messages from './routes/messages.js';
 import posts from './routes/posts.js';
 import confessions from './routes/confessions.js';
+import uploads from './routes/uploads.js';
 import misc from './routes/misc.js';
 import admin from './routes/admin.js';
 
@@ -27,6 +28,7 @@ export function createApp(env: Env = {}) {
   app.route('/api', messages); // /api/conversations/*, /api/messages/*
   app.route('/api', posts); // /api/posts/*, /api/comments/*, /api/community/*
   app.route('/api', confessions); // /api/confessions/*, /api/comments/confessions/*
+  app.route('/api/uploads', uploads); // /api/uploads/avatar, /api/uploads/:key
   app.route('/api', misc); // /api/notifications/*, /api/reports/*, /api/blocks/*
   app.route('/api', admin); // /api/admin/*
   app.notFound((c) => fail(c, 404, 'not_found', 'Route not found'));
