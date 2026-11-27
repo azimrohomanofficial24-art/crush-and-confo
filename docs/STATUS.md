@@ -86,8 +86,11 @@ test account was created):
   → 200; forgot-password → body contains `devResetToken`; 15 wrong
   logins → all 401 (no 429 at the new 30/min limit); under-18 register
   → 400; duplicate register → 409. Test DB deleted afterwards.
-- **Still blocked for live:** this change is **NOT pushed to GitHub and
-  NOT redeployed** from this session if the push below failed — see §6.
+- **Still blocked for live:** this change was **PUSHED to GitHub
+  2026-11-27 ~15:47 +06** (commit `a540ebf6` "Fix login, email verification
+  and UI polish (audit 2026-11-27)", 11 files, verified by reading
+  `apps/worker/src/routes/auth.ts` back from GitHub) but is **NOT
+  redeployed** — the live site still runs version `384444c9` (old code).
   Live email still needs a Resend account + verified domain +
   `wrangler secret put RESEND_API_KEY` + verified `RESEND_FROM` +
   redeploy (see docs/EMAIL.md); until then the in-app verify/reset
