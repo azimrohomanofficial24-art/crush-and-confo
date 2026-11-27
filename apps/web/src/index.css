@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light; }
+* { -webkit-tap-highlight-color: transparent; }
+html { scroll-behavior: smooth; }
+body {
+  background: #F7F5FF;
+  color: #211B3B;
+  font-family: 'Inter', 'Manrope', 'Plus Jakarta Sans', system-ui, sans-serif;
+  overflow-x: hidden;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(600px 400px at 85% -5%, rgba(245, 45, 145, 0.10), transparent 60%),
+    radial-gradient(700px 500px at -10% 20%, rgba(135, 59, 250, 0.10), transparent 60%),
+    radial-gradient(500px 400px at 50% 110%, rgba(233, 223, 255, 0.55), transparent 60%);
+}
+@layer components {
+  .glass { @apply bg-white/80 backdrop-blur-xl border border-white/70 shadow-glass rounded-3xl; }
+  .glass-soft { @apply bg-white/70 backdrop-blur-lg border border-white/60 shadow-soft rounded-2xl; }
+  .btn-gradient { @apply inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-pink to-purple text-white font-semibold px-5 py-2.5 text-sm shadow-lg shadow-pink/25 transition hover:opacity-90 active:scale-[0.98] disabled:opacity-50 min-h-[44px]; }
+  .btn-ghost { @apply inline-flex items-center justify-center gap-2 rounded-full bg-white border border-lavender text-ink font-semibold px-5 py-2.5 text-sm transition hover:bg-lavender/40 active:scale-[0.98] min-h-[44px]; }
+  .btn-danger { @apply inline-flex items-center justify-center gap-2 rounded-full bg-error/10 text-error font-semibold px-4 py-2 text-sm transition hover:bg-error/20 min-h-[40px]; }
+  .input { @apply w-full rounded-2xl border border-lavender bg-white px-4 py-3 text-sm text-ink placeholder:text-muted/70 outline-none focus:border-purple focus:ring-2 focus:ring-purple/20 transition; }
+  .label { @apply block text-sm font-semibold text-ink mb-1.5; }
+  .chip { @apply inline-flex items-center gap-1 rounded-full bg-lavender/70 text-purple px-3 py-1 text-xs font-semibold; }
+  .nav-item { @apply flex items-center gap-3 rounded-2xl px-4 py-3 text-[15px] font-medium text-ink/80 transition hover:bg-white hover:shadow-soft hover:text-ink; }
+  .nav-item-active { @apply bg-white shadow-soft text-ink font-semibold; }
+  .card-title { @apply font-display font-bold text-lg text-ink; }
+  .skeleton { @apply animate-pulse rounded-2xl bg-lavender/60; }
+}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+/* Minimal dark mode (toggle in topbar) */
+.dark-mode body { background: #17142C; color: #F7F5FF; }
+.dark-mode body::before { opacity: 0.25; }
+.dark-mode .glass, .dark-mode .glass-soft { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.12); }
+.dark-mode .glass *, .dark-mode .glass-soft * { color: #F7F5FF; }
+.dark-mode .input { background: rgba(255,255,255,0.08); color: #F7F5FF; border-color: rgba(255,255,255,0.15); }
+.dark-mode .nav-item { color: rgba(247,245,255,0.75); }
+.dark-mode .nav-item:hover, .dark-mode .nav-item-active { background: rgba(255,255,255,0.1); color: #fff; }
