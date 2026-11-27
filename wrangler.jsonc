@@ -1,0 +1,93 @@
+{
+  // Cloudflare Workers + Static Assets (Vite build output) for Crush and Confo.
+  // See docs/DEPLOYMENT.md for the full setup. NEVER put real secrets in this file.
+  // $schema: "https://developers.cloudflare.com/workers/wrangler/configuration/schema.json",
+  "name": "crush-and-confo",
+  "compatibility_date": "2025-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "apps/worker/src/index.ts",
+
+  // Serve the Vite build as static assets; /api/* is handled by the Worker (Hono).
+  "assets": {
+    "directory": "./apps/web/dist",
+    "not_found_handling": "single-page-application"
+  },
+
+  // D1 — primary database (SQLite). Create before first deploy:
+  //   wrangler d1 create crush-and-confo-db
+  // then paste the returned database_id below (dev + production share the id
+  // here; use a separate database per env if you prefer).
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "crush-and-confo-db",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // R2 — user uploads (photos, avatars). Create before first deploy:
+  //   wrangler r2 bucket create crush-and-confo-uploads
+  "r2_buckets": [
+    {
+      "binding": "UPLOADS",
+      "bucket_name": "crush-and-confo-uploads"
+    }
+  ],
+
+  // KV — cache / rate-limit counters.
+  //   wrangler kv namespace create crush-and-confo-kv
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      "id": "REPLACE_WITH_KV_NAMESPACE_ID"
+    }
+  ],
+
+  // Durable Object — chat coordination (typing indicators, presence).
+  // The ChatRoom class is implemented in apps/worker (Agent B).
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CHAT_ROOM",
+        "class_name": "ChatRoom"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ChatRoom"]
+    }
+  ],
+
+  "vars": {
+    "APP_NAME": "Crush and Confo",
+    "APP_URL": "http://localhost:5173",
+    "EMAIL_FROM": "Crush and Confo <noreply@example.com>",
+    "RESEND_DEV_MODE": "true"
+  },
+
+  "env": {
+    "dev": {
+      "vars": {
+        "APP_URL": "http://localhost:5173",
+        "RESEND_DEV_MODE": "true"
+      }
+    },
+    "production": {
+      "vars": {
+        "APP_URL": "https://crush-and-confo.pages.dev",
+        "RESEND_DEV_MODE": "false"
+      }
+      // Production D1/R2/KV bindings are inherited from the top level.
+      // Replace APP_URL with the custom domain once it is bought and added
+      // (see docs/DEPLOYMENT.md — custom domain is a later step).
+    }
+  },
+
+  // Build command used by `wrangler deploy` / Cloudflare Pages.
+  "build": {
+    "command": "npm run build"
+  }
+}
