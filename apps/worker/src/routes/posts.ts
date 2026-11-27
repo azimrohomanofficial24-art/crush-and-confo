@@ -16,7 +16,9 @@ async function postDto(db: any, p: typeof posts.$inferSelect, me?: string | null
   const commentCount = await countRows(db, comments, eq(comments.postId, p.id));
   let likedByMe = false;
   if (me) { const [l] = await db.select().from(postLikes).where(and(eq(postLikes.postId, p.id), eq(postLikes.userId, me))).limit(1); likedByMe = Boolean(l); }
-  return { ...p, hashtags: parseJson<string[]>(p.hashtags, []), author: u ? publicUserRow(u, prof) : null, likeCount, commentCount, likedByMe };
+  let savedByMe = false;
+  if (me) { const [s] = await db.select().from(savedPosts).where(and(eq(savedPosts.postId, p.id), eq(savedPosts.userId, me))).limit(1); savedByMe = Boolean(s); }
+  return { ...p, hashtags: parseJson<string[]>(p.hashtags, []), author: u ? publicUserRow(u, prof) : null, likeCount, commentCount, likedByMe, savedByMe };
 }
 function cursorFilter(rows: any[], cursor: any, limit: number) {
   let list = rows;
